@@ -1,0 +1,6 @@
+Protocolo;Serie;Modelo;Fila;Solicitacao;Status;Empresa;Cidade;A4;TonerPreto;Data;DataEntrega;Solicitante;Ramal;Obs
+1;EX-SN001;ZT421;FILA-EXEMPLO-01;Telefone;Entregue;Empresa Exemplo S.A.;São Paulo;3;1;01/04/2026;03/04/2026;João Silva;1234;
+2;EX-SN002;SLM4020;FILA-EXEMPLO-02;Email;Pendente;Empresa Exemplo S.A.;São Paulo;2;0;10/04/2026;;Maria Santos;5678;Urgente
+3;EX-SN003;C405;FILA-EXEMPLO-03;Telefone;Entregue;Empresa Exemplo S.A.;Campinas;5;2;05/04/2026;07/04/2026;Carlos Oliveira;9012;
+4;EX-SN004;ZT421;FILA-EXEMPLO-04;Sistema;Cancelado;Empresa Exemplo S.A.;São Paulo;1;0;08/04/2026;;Ana Costa;3456;Cancelado por duplicidade
+5;EX-SN005;SLM4020;FILA-EXEMPLO-05;Telefone;Pendente;Empresa Exemplo S.A.;Rio de Janeiro;4;1;12/04/2026;;Pedro Lima;7890;

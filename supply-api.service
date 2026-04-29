@@ -1,0 +1,17 @@
+[Unit]
+Description=Supply Management API
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/supply
+EnvironmentFile=/opt/supply/.env
+Environment="PYTHONPATH=/opt/supply:/opt/supply/backend"
+Environment="SUPPLY_ALLOWED_ORIGINS=https://YOUR_DOMAIN"
+Environment="SUPPLY_SECRET_KEY=YOUR_SECRET_KEY_HERE"
+ExecStart=/opt/supply/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

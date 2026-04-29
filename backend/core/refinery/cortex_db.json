@@ -1,0 +1,8 @@
+{
+    "mappings": {
+        "strange column x": "observacao",
+        "serial no": "SERIE",
+        "obs_x": "observacao",
+        "my_serial": "SERIE"
+    }
+}

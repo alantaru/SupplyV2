@@ -1,0 +1,84 @@
+/* Supply 2026 Legacy Layout Styles (Indigo/Slate) */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;700&family=JetBrains+Mono&display=swap');
+
+:root {
+  --color-primary: 79 70 229; /* Indigo-600 */
+  --primary-glow: rgba(79, 70, 229, 0.4);
+  
+  /* Legacy Palette */
+  --bg-main: #f8fafc; /* Slate-50 */
+  --bg-sidebar: #0f172a; /* Slate-900 */
+  --border-light: #e2e8f0; /* Slate-200 */
+  
+  /* Modern Popup Management Styles */
+  --blur-standard: blur(12px);
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  --bg-glass-dark: rgba(15, 23, 42, 0.8);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+  background-color: var(--bg-main);
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode — applied via .dark class on <html> */
+html.dark {
+  color-scheme: dark;
+  background-color: #020617;
+}
+
+html.dark body {
+  background-color: #020617;
+  color: #f1f5f9;
+}
+
+/* Modern Popup Utility */
+.glass-surface {
+  backdrop-filter: var(--blur-standard);
+  background: var(--bg-glass);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.dark .glass-surface {
+  background: var(--bg-glass-dark);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom Scrollbar for modern feel */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    color: black !important;
+  }
+}

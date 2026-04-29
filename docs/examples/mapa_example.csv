@@ -1,0 +1,6 @@
+SERIE;MODELOSIMPRESS;FILA;STATUS;CIDADE;EMPRESA;LOCALINSTALACAO;RUAREF;AREA;CONTATOSETOR;RAMAL;PLANTAINSTALADA;CONTRATO
+EX-SN001;ZT421;FILA-EXEMPLO-01;Ativo;São Paulo;Empresa Exemplo S.A.;Sala de Reuniões 1;Av. Paulista 1000;TI;João Silva;1234;Planta SP;CONTRATO-EXEMPLO
+EX-SN002;SLM4020;FILA-EXEMPLO-02;Ativo;São Paulo;Empresa Exemplo S.A.;Recepção;Av. Paulista 1000;Administrativo;Maria Santos;5678;Planta SP;CONTRATO-EXEMPLO
+EX-SN003;C405;FILA-EXEMPLO-03;Ativo;Campinas;Empresa Exemplo S.A.;Diretoria;Rua das Flores 200;Diretoria;Carlos Oliveira;9012;Planta Campinas;CONTRATO-EXEMPLO
+EX-SN004;ZT421;FILA-EXEMPLO-04;Backup;São Paulo;Empresa Exemplo S.A.;Almoxarifado;Av. Paulista 1000;Logística;Ana Costa;3456;Planta SP;CONTRATO-EXEMPLO
+EX-SN005;SLM4020;FILA-EXEMPLO-05;Ativo;Rio de Janeiro;Empresa Exemplo S.A.;Sala Técnica;Rua do Ouvidor 50;TI;Pedro Lima;7890;Planta RJ;CONTRATO-EXEMPLO

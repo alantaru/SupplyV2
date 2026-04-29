@@ -1,0 +1,8 @@
+TipoModelo;EstoqueAtual;UltimaAlteracao;Cor;Empresa;Codigo;Categoria;ModeloEquipamento;TipoToner
+A4 (RESMAS);150;15/04/2026;;Empresa Exemplo S.A.;A4-001;papel;;
+A3 (RESMAS);30;15/04/2026;;Empresa Exemplo S.A.;A3-001;papel;;
+BK ZT421;12;10/04/2026;Preto;Empresa Exemplo S.A.;TN-BK-ZT421;toner;ZT421;BK
+BK SLM4020;8;10/04/2026;Preto;Empresa Exemplo S.A.;TN-BK-SLM;toner;SLM4020;BK
+CY C405;5;10/04/2026;Ciano;Empresa Exemplo S.A.;TN-CY-C405;toner;C405;CY
+MG C405;4;10/04/2026;Magenta;Empresa Exemplo S.A.;TN-MG-C405;toner;C405;MG
+YW C405;6;10/04/2026;Amarelo;Empresa Exemplo S.A.;TN-YW-C405;toner;C405;YW

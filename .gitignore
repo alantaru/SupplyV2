@@ -1,0 +1,98 @@
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+venv/
+.venv/
+env/
+.env
+.env.*
+!.env.*.example
+.pytest_cache/
+.hypothesis/
+.coverage
+.coveragerc
+*.egg-info/
+dist/
+build/
+htmlcov/
+
+# ─── Node / Frontend ──────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+.DS_Store
+*.local
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Supply — Dados de Contrato (ficam no S3, não no git) ────────────────────
+contracts/
+backend/contracts/
+backend/test_contracts/
+backend/test_contracts_hierarchy/
+backend/uploads/
+backend/logs/
+refinery/
+BRAIN/
+exports_verification/
+project_docs/
+
+# ─── Supply — Arquivos de Build/Deploy Temporários ───────────────────────────
+*.tar.gz
+*.zip
+deploy_package*.tar.gz
+backend_pkg.tar.gz
+backend.tar.gz
+frontend.tar.gz
+
+# ─── Secrets & Chaves — NUNCA commitar ───────────────────────────────────────
+supply-key.pem
+*.pem
+users.json
+backend/test_users.json
+backend/test_users_hierarchy.json
+
+# ─── Scripts de Setup/Deploy (sensíveis) ─────────────────────────────────────
+setup_*.sh
+deploy_to_ec2.sh
+retry_deploy.sh
+revert_script.sh
+reinstall_docker.sh
+start_app.sh
+bootstrap_nginx.conf
+nginx_*.conf
+supply-api.service
+amplify.yml
+docker-compose.yml
+
+# ─── Scripts de Teste Ad-hoc na Raiz ─────────────────────────────────────────
+test_*.py
+repair_mappings.py
+
+# ─── Arquivos de Resultado de Testes Temporários ─────────────────────────────
+backend/final_verify.txt
+backend/full_test_result*.txt
+backend/test_result*.txt
+
+# ─── E2E — Credenciais e Artefatos ───────────────────────────────────────────
+backend/tests/e2e/.env.e2e
+backend/tests/e2e/artifacts/screenshots/*.png
+backend/tests/e2e/artifacts/traces/*.zip
+!backend/tests/e2e/artifacts/screenshots/.gitkeep
+!backend/tests/e2e/artifacts/traces/.gitkeep
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+backend/logs/
+
+# ─── SSH Keys ─────────────────────────────────────────────────────────────────
+ssh_keys/
+
+# Kiro IDE workspace files (internal)
+.kiro/
+

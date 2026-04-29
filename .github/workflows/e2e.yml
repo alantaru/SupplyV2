@@ -1,0 +1,172 @@
+name: E2E Tests — Supply 2026
+
+on:
+  workflow_dispatch:
+    inputs:
+      marker:
+        description: 'Marcador pytest (smoke, critical, slow, e2e)'
+        required: false
+        default: 'smoke'
+  # Disparado manualmente após deploy bem-sucedido
+  # Para integrar ao pipeline de deploy, adicionar:
+  # workflow_run:
+  #   workflows: ["Deploy"]
+  #   types: [completed]
+
+env:
+  E2E_BASE_URL: https://your-domain.com
+  E2E_TEST_CONTRACT_ID: ${{ secrets.E2E_TEST_CONTRACT_ID }}
+  E2E_DEFAULT_TIMEOUT: "15000"
+
+jobs:
+  # ─── Health Check ──────────────────────────────────────────────────────────
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar se o sistema está online
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" $E2E_BASE_URL/api/health)
+          if [ "$response" != "200" ]; then
+            echo "Sistema offline ou com erro: HTTP $response"
+            exit 1
+          fi
+          echo "Sistema online: HTTP $response"
+
+  # ─── Smoke Tests ──────────────────────────────────────────────────────────
+  e2e-smoke:
+    name: E2E Smoke Tests
+    runs-on: ubuntu-latest
+    needs: health-check
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependências
+        run: |
+          pip install pytest pytest-playwright hypothesis python-dotenv pytest-timeout
+          playwright install chromium --with-deps
+
+      - name: Executar smoke tests
+        env:
+          E2E_SUPERADMIN_USER: ${{ secrets.E2E_SUPERADMIN_USER }}
+          E2E_SUPERADMIN_PASS: ${{ secrets.E2E_SUPERADMIN_PASS }}
+          E2E_ADMIN_USER: ${{ secrets.E2E_ADMIN_USER }}
+          E2E_ADMIN_PASS: ${{ secrets.E2E_ADMIN_PASS }}
+          E2E_USER_USER: ${{ secrets.E2E_USER_USER }}
+          E2E_USER_PASS: ${{ secrets.E2E_USER_PASS }}
+        run: |
+          pytest backend/tests/e2e/ -m smoke \
+            --tb=short \
+            --timeout=60 \
+            -v \
+            --no-header \
+            -p no:warnings
+
+      - name: Upload artefatos de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-smoke-artifacts-${{ github.run_id }}
+          path: backend/tests/e2e/artifacts/
+          retention-days: 7
+
+  # ─── Critical Tests ────────────────────────────────────────────────────────
+  e2e-critical:
+    name: E2E Critical Tests
+    runs-on: ubuntu-latest
+    needs: e2e-smoke
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependências
+        run: |
+          pip install pytest pytest-playwright hypothesis python-dotenv pytest-timeout
+          playwright install chromium --with-deps
+
+      - name: Executar testes críticos
+        env:
+          E2E_SUPERADMIN_USER: ${{ secrets.E2E_SUPERADMIN_USER }}
+          E2E_SUPERADMIN_PASS: ${{ secrets.E2E_SUPERADMIN_PASS }}
+          E2E_ADMIN_USER: ${{ secrets.E2E_ADMIN_USER }}
+          E2E_ADMIN_PASS: ${{ secrets.E2E_ADMIN_PASS }}
+          E2E_USER_USER: ${{ secrets.E2E_USER_USER }}
+          E2E_USER_PASS: ${{ secrets.E2E_USER_PASS }}
+        run: |
+          pytest backend/tests/e2e/ -m critical \
+            --tb=short \
+            --timeout=120 \
+            -v \
+            --no-header \
+            -p no:warnings
+
+      - name: Upload artefatos de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-critical-artifacts-${{ github.run_id }}
+          path: backend/tests/e2e/artifacts/
+          retention-days: 14
+
+  # ─── Slow Tests (Nightly) ─────────────────────────────────────────────────
+  e2e-slow:
+    name: E2E Slow Tests (Fluxos Completos)
+    runs-on: ubuntu-latest
+    needs: e2e-critical
+    timeout-minutes: 45
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.marker == 'slow'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependências
+        run: |
+          pip install pytest pytest-playwright hypothesis python-dotenv pytest-timeout
+          playwright install chromium --with-deps
+
+      - name: Executar testes lentos
+        env:
+          E2E_SUPERADMIN_USER: ${{ secrets.E2E_SUPERADMIN_USER }}
+          E2E_SUPERADMIN_PASS: ${{ secrets.E2E_SUPERADMIN_PASS }}
+          E2E_ADMIN_USER: ${{ secrets.E2E_ADMIN_USER }}
+          E2E_ADMIN_PASS: ${{ secrets.E2E_ADMIN_PASS }}
+          E2E_USER_USER: ${{ secrets.E2E_USER_USER }}
+          E2E_USER_PASS: ${{ secrets.E2E_USER_PASS }}
+        run: |
+          pytest backend/tests/e2e/ -m slow \
+            --tb=long \
+            --timeout=300 \
+            -v \
+            --no-header
+
+      - name: Upload artefatos de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-slow-artifacts-${{ github.run_id }}
+          path: backend/tests/e2e/artifacts/
+          retention-days: 30

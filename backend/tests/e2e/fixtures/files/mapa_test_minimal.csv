@@ -1,0 +1,6 @@
+SERIE;MODELOSIMPRESS;FILA;STATUS;CIDADE;EMPRESA;LOCALINSTALACAO;RUAREF;AREA;CONTATOSETOR;RAMAL;PLANTAINSTALADA;CONTRATO
+E2E-SN001;ZT421;E2E-FILA01;Ativo;Franca;Empresa E2E;Sala de Testes 1;Rua E2E 100;TI;E2E Contato;1234;Planta E2E;e2e-test-contract-2026
+E2E-SN002;SLM4020;E2E-FILA02;Ativo;Franca;Empresa E2E;Sala de Testes 2;Rua E2E 200;RH;E2E Contato 2;5678;Planta E2E;e2e-test-contract-2026
+E2E-SN003;ZT421;E2E-FILA03;Backup;Ipatinga;Empresa E2E;Sala de Testes 3;Rua E2E 300;TI;E2E Contato 3;9012;Planta E2E;e2e-test-contract-2026
+E2E-SN004;C405;E2E-FILA04;Ativo;Ipatinga;Empresa E2E;Sala de Testes 4;Rua E2E 400;Financeiro;E2E Contato 4;3456;Planta E2E;e2e-test-contract-2026
+E2E-SN005;SLM4020;E2E-FILA05;Ativo;Franca;Empresa E2E;Sala de Testes 5;Rua E2E 500;Operações;E2E Contato 5;7890;Planta E2E;e2e-test-contract-2026
