@@ -96,4 +96,4 @@ class LoginPage(BasePage):
 
     def expect_on_login_page(self) -> None:
         """Verifica que a URL atual é /login."""
-        expect(self.page).to_have_url("**login**")
+        expect(self.page).to_have_url(f"**login**")

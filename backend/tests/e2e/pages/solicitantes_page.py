@@ -3,7 +3,7 @@ SolicitantesPage — Page Object para o módulo de solicitantes (/solicitantes).
 """
 from __future__ import annotations
 
-from playwright.sync_api import Locator
+from playwright.sync_api import Page, Locator, expect
 
 from .base_page import BasePage
 

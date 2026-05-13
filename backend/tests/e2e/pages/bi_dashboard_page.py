@@ -3,7 +3,7 @@ BIDashboardPage — Page Object para o BI Dashboard (/equipment/bi).
 """
 from __future__ import annotations
 
-from playwright.sync_api import Locator
+from playwright.sync_api import Page, Locator, expect
 
 from .base_page import BasePage
 
