@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Search, Wrench, Camera, Clipboard as ClipboardIcon, CheckCircle, AlertCircle, Trash2, Copy, Plus, Package } from 'lucide-react';
 import api from '../../lib/api';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthProvider';
 import SearchStep from '../Wizard/SearchStep';
 
-export default function OSWizard({ isOpen, onClose, onSuccess }) {
+export default function OSWizard({ isOpen, onClose, onSuccess, preSelectedSerie }) {
     const { user } = useAuth();
     const activeContract = user?.activeContract;
     const [step, setStep] = useState(1);
