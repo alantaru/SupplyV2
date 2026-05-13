@@ -1,14 +1,11 @@
-from typing import Dict
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
 try:
     from .. import logic_upload, database
-    from ..auth import get_current_admin
     from ..core.session import ContractSession
     from ..dependencies import get_authorized_session
 except (ImportError, ValueError):
     import logic_upload
     import database
-    from auth import get_current_admin
     from core.session import ContractSession
     from dependencies import get_authorized_session
 
@@ -132,10 +129,9 @@ async def confirm_mapping_endpoint(
 @router.post("/upload/csv/{file_key}/delete")
 async def delete_csv_file(
     file_key: str,
-    contract_id: str = Query(None),
-    admin: Dict = Depends(get_current_admin)
+    session: ContractSession = Depends(get_authorized_session)
 ):
     """
-    Deletes an individual data file. Only for Admins/Superadmins.
+    Deletes an individual data file. Only for Admins/Superadmins (handled by get_authorized_session + logic_upload).
     """
-    return logic_upload.delete_data_file(file_key, contract_id)
+    return logic_upload.delete_data_file(file_key, session.contract_id)

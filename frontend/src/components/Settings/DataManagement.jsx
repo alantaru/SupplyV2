@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthProvider';
@@ -10,6 +10,7 @@ import { downloadFileFromAPI } from '../../lib/utils';
 import ColumnMappingModal from '../Wizard/ColumnMappingModal';
 import ColumnMappingSettings from './ColumnMappingSettings';
 import GenericDeleteModal from '../Shared/GenericDeleteModal';
+import ConflictResolutionModal from '../Mapa/ConflictResolutionModal';
 
 const FILES = [
     // Base/Editable Files
@@ -108,6 +109,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
     const [metadata, setMetadata] = useState(null); // { last_modified, exists }
     const [downloading, setDownloading] = useState(false);
     const [mappingData, setMappingData] = useState(null); // For dynamic mapping modal
+    const [conflictData, setConflictData] = useState(null); // For map conflict resolution
     const [showMappingSettings, setShowMappingSettings] = useState(false); // Toggle embedded mapping
 
     // Archive Logic States
@@ -131,7 +133,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
         try {
             const res = await api.get(`/preview/${fileConfig.key}`);
             setMetadata(res.data);
-        } catch (e) { /* Silent */ }
+        } catch (_e) { /* Silent */ }
     };
 
     const loadBackups = async () => {
@@ -139,7 +141,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
             setLoadingBackups(true);
             const res = await api.get(`/backups/${fileConfig.key}`);
             setBackups(Array.isArray(res.data) ? res.data : []);
-        } catch (e) { setBackups([]); }
+        } catch (_e) { setBackups([]); }
         finally { setLoadingBackups(false); }
     };
 
@@ -170,8 +172,10 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
                 loadMetadata();
             } else if (res.data.status === 'mapping_required') {
                 setMappingData(res.data);
+            } else if (res.data.status === 'conflicts_found') {
+                setConflictData(res.data);
             }
-        } catch (error) {
+        } catch (_error) {
             const msg = error.response?.data?.detail || "Erro no upload.";
             setStatus({ type: 'error', msg });
         } finally {
@@ -208,7 +212,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
                 loadBackups();
                 loadMetadata();
             }
-        } catch (err) {
+        } catch (_err) {
             addToast(err.response?.data?.detail || "Erro ao confirmar mapeamento.", "error");
         } finally {
             setUploading(false);
@@ -227,7 +231,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
                     addToast("Restaurado com sucesso!", "success");
                     loadBackups();
                     loadMetadata();
-                } catch (e) { addToast("Erro ao restaurar.", "error"); }
+                } catch (_e) { addToast("Erro ao restaurar.", "error"); }
             },
             icon: RefreshCcw,
             variant: "info",
@@ -247,7 +251,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
                 try {
                     await api.delete(`/backups/${filename}`);
                     loadBackups();
-                } catch (e) {
+                } catch (_e) {
                     addToast("Erro ao excluir backup.", "error");
                 }
             }
@@ -259,7 +263,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
         try {
             const res = await api.get('archive/list', { params: { contract_id: activeContract } });
             setArchives(Array.isArray(res.data) ? res.data : []);
-        } catch (error) { setArchives([]); }
+        } catch (_error) { setArchives([]); }
     };
 
     const handleArchive = async () => {
@@ -279,7 +283,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
                     loadArchives();
                     setArchiveDate('');
                     loadMetadata();
-                } catch (error) {
+                } catch (_error) {
 
                     addToast(error.response?.data?.detail || "Erro ao arquivar.", "error");
                 } finally {
@@ -363,7 +367,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
                                                 addToast("Arquivo deletado com sucesso. Backup criado.", "success");
                                                 loadBackups();
                                                 loadMetadata();
-                                            } catch (e) {
+                                            } catch (_e) {
 
                                                 addToast("Erro ao deletar arquivo.", "error");
                                             }
@@ -555,6 +559,18 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
                 isLoading={uploading}
             />
 
+            <ConflictResolutionModal
+                isOpen={!!conflictData}
+                conflicts={conflictData?.conflicts || []}
+                tempToken={conflictData?.temp_token}
+                onClose={() => setConflictData(null)}
+                onSuccess={() => {
+                    setConflictData(null);
+                    addToast("Mapa sincronizado com sucesso!", "success");
+                    loadMetadata();
+                }}
+            />
+
             {deleteModal && (
                 <GenericDeleteModal
                     title={deleteModal.title}
@@ -565,7 +581,7 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
                     icon={deleteModal.icon}
                     variant={deleteModal.variant}
                     confirmLabel={deleteModal.confirmLabel}
-                    requireTyping={deleteModal.requireTyping !== false}
+                    requireTyping={deleteModal.requireTyping === true}
                 />
             )}
         </div>
@@ -574,12 +590,12 @@ function FileManagementCard({ fileConfig, activeContract, onPreview }) {
 
 
 function PreviewModal({ file, onClose }) {
-    const { addToast } = useToast();
-    if (!file || !file.data || !file.data.rows) return null;
-    const { rows, columns } = file.data;
-
+    const { addToast: _addToast } = useToast();
     // Pagination
-    const { currentData: currentRows, paginationProps } = usePagination(rows, 20);
+    const { currentData: currentRows, paginationProps } = usePagination(file?.data?.rows || [], 20);
+
+    if (!file || !file.data || !file.data.rows) return null;
+    const { columns } = file.data;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -640,7 +656,7 @@ function ResetDatabaseModal({ contractId, onClose, onSuccess }) {
             // Recarrega lista de backups
             const r2 = await api.get(`/admin/contracts/${contractId}/reset-backups`);
             setResetBackups(Array.isArray(r2.data) ? r2.data : []);
-        } catch (e) {
+        } catch (_e) {
             addToast(e.response?.data?.detail || "Erro ao realizar virada de período.", "error");
         } finally {
             setLoading(false);

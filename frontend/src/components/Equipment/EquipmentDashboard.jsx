@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
@@ -77,12 +77,7 @@ function TonerBars({ bk, cy, mg, yw }) {
 export default function EquipmentDashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
-    const activeContract = user?.activeContract;
-
-    // Robust contract ID
-    const contractId = typeof activeContract === 'string'
-        ? activeContract
-        : activeContract?.contract_id || activeContract?.id;
+    const contractId = user?.activeContract;
 
     const [trends, setTrends] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -537,7 +532,7 @@ export default function EquipmentDashboard() {
             {selectedEquipment && (
                 <EquipmentModal
                     serie={selectedEquipment}
-                    activeContract={activeContract}
+                    activeContract={contractId}
                     onClose={() => setSelectedEquipment(null)}
                 />
             )}

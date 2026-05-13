@@ -1,0 +1,17 @@
+{
+  "required_headers": {
+    "ENTREGAS": ["Protocolo", "Serie", "Modelo", "Fila", "Status", "DataEntrega", "A4", "TonerPreto", "TonerCiano", "TonerAmarelo", "TonerMagenta"],
+    "ESTOQUE": ["TipoModelo", "EstoqueAtual", "UltimaAlteracao", "Categoria"],
+    "MAPA": ["SERIE"],
+    "CONTADORES": ["SERIE", "TOTAL", "DATA"]
+  },
+  "canonical_aliases": {
+    "SERIE": ["SERIAL", "SÉRIE", "SN", "SERVICETAG", "NUMEROSERIE", "ASSETID"],
+    "FILA": ["QUEUE", "NOMEFILA", "PRINTQUEUE", "HOST NAME", "HOSTNAME"],
+    "LOCALINSTALACAO": ["LOCAL", "ENDERECO", "LOCATION", "UBICACION"]
+  },
+  "protocol_snapshot_fields": [
+    "PorcentagemBK", "PorcentagemCY", "PorcentagemMG", "PorcentagemYW",
+    "IP", "StatusEquipamento", "Marca", "UF", "CentroCusto", "Gerencia"
+  ]
+}

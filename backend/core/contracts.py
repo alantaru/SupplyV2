@@ -54,7 +54,13 @@ REQUIRED_HEADERS = {
     # Dynamic Files (Uploaded) - STRICTLY REQUIRED
     "PAPEL": ["SERIE"],
     "CONTADORES": ["SERIE", "TOTAL", "DATA"],
-    "MAPA": ["SERIE"] 
+    "MAPA": ["SERIE"],
+    # Maintenance & Technical Parts
+    "MANUTENCAO_CONTROLE": ["Serie", "ContadorAtual"],
+    "MANUTENCAO_OS": ["ID_OS", "Serie", "DataAbertura", "TipoServico"],
+    "MANUTENCAO_PECAS": ["CodigoPeca", "Descricao", "VidaUtilNominal"],
+    "MAPA_DIVERGENCIAS": ["Serie", "Campo", "ValorTecnico", "ValorOficial"],
+    "NOTAS_FISCAIS": ["NumeroNF", "DataRecebimento"]
 }
 
 # The System is Universal: All these fields are recognized and used if present.
@@ -88,7 +94,8 @@ COLUMN_ALIASES = {
     "FILA": ["QUEUE", "NOMEFILA", "PRINTQUEUE", "NOME_FILA", "FILA_IMPRESSAO"],
     "MODELOSIMPRESS": ["MODELO", "MODEL", "EQUIPAMENTO", "MACHINE", "DEVICE"],
     "STATUS": ["ESTADO", "SITUACAO", "SITUAÇÃO", "STATUS_DEVICE"],
-    "LOCALINSTALACAO": ["LOCAL", "LOCAL INSTALACAO", "LOCAL INSTALAÇÃO", "LOCAL DE INSTALACAO", "LOCAL DE INSTALAÇÃO", "ENDERECO", "ENDEREÇO", "ADDRESS", "LOCATION", "UBICACION"],
+    "LOCALINSTALACAO": ["LOCAL", "LOCAL INSTALACAO", "LOCAL INSTALAÇÃO", "LOCAL DE INSTALACAO", "LOCAL DE INSTALAÇÃO", "ADDRESS", "LOCATION", "UBICACION"],
+    "ENDERECO": ["ENDEREÇO", "ENDERECOCOMPLETO", "ENDEREÇO COMPLETO", "LOGRADOURO_COMPLETO"],
     "RUAREF": ["RUA", "RUA REF", "RUA / REF", "RUA/REF", "STREET", "LOGRADOURO", "RUA_REFERENCIA"],
     "CIDADE": ["CITY", "MUNICIPIO", "MUNICÍPIO", "SITE", "LOCALIDADE"],
     "EMPRESA": ["COMPANY", "CLIENTE", "CUSTOMER", "CLIENT"],
@@ -227,15 +234,19 @@ class ContractsManager:
             admin_id=admin_id
         )
 
+        meta_dict = meta.model_dump()
+        # Always persist admin_ids list alongside legacy admin_id
+        meta_dict["admin_ids"] = [admin_id] if admin_id else []
+
         # Save metadata to storage
         storage.ensure_dir(key)
         with fsspec.open(storage.get_uri(key), "w", encoding="utf-8") as f:
-            json.dump(meta.model_dump(), f, indent=4)
+            json.dump(meta_dict, f, indent=4)
 
         # Initialize Files
         self.initialize_files(contract_id)
 
-        return meta.model_dump()
+        return meta_dict
 
     def update_contract(self, contract_id: str, data: dict) -> Dict[str, Any]:
         import fsspec
@@ -247,9 +258,26 @@ class ContractsManager:
             raise ValueError("Contract not found")
 
         # Update allowed fields
-        for field in ["name", "description", "status"]:
+        for field in ["name", "description", "status", "admin_id", "admin_ids"]:
             if field in data:
                 current_data[field] = data[field]
+
+        # Keep admin_ids and admin_id in sync for backward compat
+        if "admin_ids" in data:
+            ids = data["admin_ids"]
+            current_data["admin_ids"] = ids
+            current_data["admin_id"] = ids[0] if ids else ""
+        elif "admin_id" in data:
+            aid = data["admin_id"]
+            current_data["admin_id"] = aid
+            # Merge into admin_ids without duplicates
+            existing = current_data.get("admin_ids", [])
+            if isinstance(existing, list):
+                if aid and aid not in existing:
+                    existing.append(aid)
+            else:
+                existing = [aid] if aid else []
+            current_data["admin_ids"] = existing
 
         # Write back to storage
         storage.ensure_dir(key)
@@ -294,6 +322,10 @@ class ContractsManager:
 
         # 4. Solicitantes.csv
         self._init_csv(database.get_data_key("SOLICITANTES", contract_id), REQUIRED_HEADERS["SOLICITANTES"], storage)
+
+        # 5. Maintenance Bases
+        for base in ["MANUTENCAO_CONTROLE", "MANUTENCAO_OS", "MANUTENCAO_PECAS", "MAPA_DIVERGENCIAS", "NOTAS_FISCAIS"]:
+            self._init_csv(database.get_data_key(base, contract_id), REQUIRED_HEADERS[base], storage)
 
     def _init_csv(self, key: str, columns: List[str], storage=None):
         if storage is None:

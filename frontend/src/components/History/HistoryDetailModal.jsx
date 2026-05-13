@@ -1,9 +1,20 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useReactToPrint } from 'react-to-print';
 import { X, Printer, MapPin, User, FileText, CheckCircle, PackageCheck } from 'lucide-react';
 import ProtocolPrint from '../Protocol/ProtocolPrint';
 import DeliveryModal from '../Protocol/ProtocolDelivery';
+
+const ReadOnlyField = ({ label, value, icon: Icon, className = "" }) => (
+    <div className={`flex flex-col ${className}`}>
+        <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 flex items-center gap-1">
+            {Icon && <Icon size={10} />} {label}
+        </label>
+        <div className="text-sm font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 min-h-[32px] flex items-center">
+            {value || '-'}
+        </div>
+    </div>
+);
 
 export default function HistoryDetailModal({ protocol, onClose }) {
     const { addToast } = useToast();
@@ -12,29 +23,17 @@ export default function HistoryDetailModal({ protocol, onClose }) {
 
     const handlePrint = useReactToPrint({
         contentRef: printRef,
-        documentTitle: `Protocolo_${protocol.Protocolo}`,
+        documentTitle: `Protocolo_${protocol?.Protocolo}`,
         onAfterPrint: () => {},
-        onPrintError: (error) => {
+        onPrintError: (_error) => {
             addToast("Erro ao imprimir: Verifique as configurações da impressora.", "error");
         }
     });
 
     if (!protocol) return null;
 
-    // Helper for read-only fields
-    const ReadOnlyField = ({ label, value, icon: Icon, className = "" }) => (
-        <div className={`flex flex-col ${className}`}>
-            <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 flex items-center gap-1">
-                {Icon && <Icon size={10} />} {label}
-            </label>
-            <div className="text-sm font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 min-h-[32px] flex items-center">
-                {value || '-'}
-            </div>
-        </div>
-    );
-
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <>
             <div className="bg-white dark:bg-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* Header */}
@@ -152,7 +151,7 @@ export default function HistoryDetailModal({ protocol, onClose }) {
                 onClose={() => setShowDelivery(false)}
                 onSuccess={() => { setShowDelivery(false); onClose(); }}
             />
-        </div>
+        </>
     );
 
 }

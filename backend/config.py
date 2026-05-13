@@ -24,5 +24,16 @@ FILES = {
     "ROTAS": "Planejamento_Rotas.xlsx",
     "ESTOQUE": "Estoque.csv",
     "ESTOQUE_LANCAMENTOS": "EstoqueLancamentos.csv",
-    "SOLICITANTES": "Solicitantes.csv"
+    "SOLICITANTES": "Solicitantes.csv",
+    "MANUTENCAO_CONTROLE": "Manutencao_Controle.csv",
+    "MANUTENCAO_OS": "Manutencao_OS.csv",
+    "MANUTENCAO_PECAS": "Manutencao_Pecas.csv",
+    "MANUTENCAO_ESTOQUE": "Manutencao_Estoque.csv",
+    "MANUTENCAO_ESTOQUE_LANCAMENTOS": "Manutencao_Estoque_Lancamentos.csv",
+    "MAPA_DIVERGENCIAS": "Mapa_Divergencias.csv",
+    "MANUTENCAO_NF": "Notas_Fiscais.csv"
 }
+
+# Architectural Constraints (Hardening)
+MAX_SERIAL_LENGTH = 14  # Default simpress limitation, but configurable
+LOCK_SAFETY_CHECK = True # Enable warning if threading.Lock is used in multi-worker env

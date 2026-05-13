@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import { forwardRef } from 'react';
 
 // === HELPERS ===
 
@@ -271,6 +271,8 @@ const ProtocolPrint = forwardRef(({ data }, ref) => {
         </div>
     );
 });
+
+ProtocolPrint.displayName = 'ProtocolPrint';
 
 export default ProtocolPrint;
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
@@ -25,6 +25,17 @@ const PLANNER_COLUMNS = [
     { key: 'data_agendada',label: 'Data Agendada', w: '150px' },
 ];
 
+// Traffic Light Component
+const TrafficLight = ({ color }) => {
+    const colors = {
+        green: "bg-emerald-500 shadow-emerald-200",
+        red: "bg-red-500 shadow-red-200",
+        yellow: "bg-amber-400 shadow-amber-100",
+        gray: "bg-slate-300"
+    };
+    return <div className={`w-3 h-3 rounded-full shadow-lg ${colors[color] || colors.gray}`} />;
+};
+
 export default function RoutePlanner() {
     const { addToast } = useToast();
     const { user } = useAuth();
@@ -45,7 +56,7 @@ export default function RoutePlanner() {
     const contractId = user?.activeContract || user?.contract_id;
 
     // Filter & Pagination
-    const filteredData = React.useMemo(() => {
+    const filteredData = useMemo(() => {
         if (!searchTerm) return planningData;
         const lower = searchTerm.toLowerCase();
         return planningData.filter(row =>
@@ -71,7 +82,7 @@ export default function RoutePlanner() {
         try {
             const res = await api.get('routes/planning', { params: { contract_id: contractId } });
             setPlanningData(res.data);
-        } catch (error) {
+        } catch (_error) {
 
         } finally {
             setLoading(false);
@@ -82,7 +93,7 @@ export default function RoutePlanner() {
         try {
             const res = await api.get('routes/settings', { params: { contract_id: contractId } });
             if (res.data) setSettings(res.data);
-        } catch (error) {
+        } catch (_error) {
 
         }
     };
@@ -92,7 +103,7 @@ export default function RoutePlanner() {
             await api.post('routes/settings', settings, { params: { contract_id: contractId } });
             setShowSettings(false);
             fetchPlanning(); // Refresh to apply new threshold
-        } catch (error) {
+        } catch (_error) {
             addToast("Erro ao salvar configurações", "error");
         }
     };
@@ -120,7 +131,7 @@ export default function RoutePlanner() {
             );
             setEditingRoute(null);
             fetchPlanning();
-        } catch (error) {
+        } catch (_error) {
             addToast("Erro ao salvar data", "error");
         }
     };
@@ -155,12 +166,12 @@ export default function RoutePlanner() {
                             { params: { contract_id: contractId } }
                         );
                         fetchPlanning();
-                    } catch (e) {
+                    } catch (_e) {
                         addToast("Erro ao calcular data.", "error");
                     }
                 }
             });
-        } catch (e) {
+        } catch (_e) {
 
             addToast("Erro ao calcular data.", "error");
         }
@@ -173,18 +184,6 @@ export default function RoutePlanner() {
             </div>
         );
     }
-
-    // Traffic Light Component
-    const TrafficLight = ({ color }) => {
-    const { addToast } = useToast();
-        const colors = {
-            green: "bg-emerald-500 shadow-emerald-200",
-            red: "bg-red-500 shadow-red-200",
-            yellow: "bg-amber-400 shadow-amber-100",
-            gray: "bg-slate-300"
-        };
-        return <div className={`w-3 h-3 rounded-full shadow-lg ${colors[color] || colors.gray}`} />;
-    };
 
     return (
         <div className="flex flex-col h-full space-y-6">

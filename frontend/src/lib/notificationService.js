@@ -46,8 +46,23 @@ export const notificationService = {
                 });
             }
 
-        } catch (e) {
-            // Silent catch - notifications are non-critical
+            // 3. Maintenance Divergences (Map Conflicts)
+            try {
+                const maintRes = await api.get('maintenance/divergences');
+                if (maintRes.data.count > 0) {
+                    notifications.push({
+                        id: 'map-divergences',
+                        type: 'error',
+                        title: 'Divergências no Mapa',
+                        message: `Existem ${maintRes.data.count} edições técnicas pendentes de sincronização.`,
+                        link: '/maintenance',
+                        date: new Date()
+                    });
+                }
+            } catch (_e) { /* Silent for maintenance */ }
+
+        } catch (_e) {
+            console.error("Failed to fetch notifications:", _e);
         }
 
         return notifications;

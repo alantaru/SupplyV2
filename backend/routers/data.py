@@ -31,94 +31,8 @@ def get_equipment_dashboard_trends(session: ContractSession = Depends(get_author
 
 @router.get("/assist/inventory")
 def get_inventory(session: ContractSession = Depends(get_authorized_session)):
-    """
-    Returns MAPA rows enriched with toner data from Contadores.
-    Server-side join using raw CSV read to bypass any normalization gaps.
-    """
-    import pandas as pd
-    try:
-        from ..core import adapters
-    except (ImportError, ValueError):
-        from core import adapters
+    return session.equipment.get_inventory_enriched()
 
-    df_mapa = database.load_mapa(session.contract_id)
-
-    if df_mapa.empty:
-        return []
-
-    # Load Contadores raw — use repair_and_load_csv directly to get all columns
-    # including toner percentages that may not survive normalize_dataframe
-    df_cnt = pd.DataFrame()
-    try:
-        cnt_key = database.get_data_key('CONTADORES', session.contract_id)
-        storage = database.get_storage()
-        if storage.exists(cnt_key):
-            cnt_uri = storage.get_uri(cnt_key)
-            df_cnt = database.repair_and_load_csv(cnt_uri, sep=';', encoding='utf-8-sig')
-            if df_cnt.empty:
-                # Try comma separator
-                df_cnt = database.repair_and_load_csv(cnt_uri, sep=',', encoding='utf-8-sig')
-    except Exception:
-        df_cnt = pd.DataFrame()
-
-    # Normalize MAPA
-    mapa_rows = adapters.normalize_dataframe(df_mapa)
-
-    # Build toner lookup from raw Contadores DataFrame
-    toner_lookup = {}
-    if not df_cnt.empty:
-        # Find serie column (case-insensitive)
-        serie_col = next(
-            (c for c in df_cnt.columns if c.strip().upper() in ('SERIE', 'SERIAL', 'SN')),
-            df_cnt.columns[0] if len(df_cnt.columns) > 0 else None
-        )
-
-        # Find toner columns by normalized name
-        def find_col(candidates):
-            for c in df_cnt.columns:
-                norm = c.strip().upper().replace(' ', '').replace('%', '')
-                for x in candidates:
-                    if norm == x.upper().replace(' ', '').replace('%', ''):
-                        return c
-            return None
-
-        col_bk = find_col(['%BK', 'BK', 'TONERBK', 'TONERBLACK', 'PRETO'])
-        col_cy = find_col(['%CY', 'CY', 'TONERCY', 'TONERCYAN', 'CIANO'])
-        col_mg = find_col(['%Mg', '%MG', 'MG', 'TONERMG', 'TONERMAGENTA', 'MAGENTA'])
-        col_yw = find_col(['%Yw', '%YW', 'YW', 'TONERYW', 'TONERYELLOW', 'AMARELO'])
-
-        if serie_col:
-            for _, row in df_cnt.iterrows():
-                serie = str(row.get(serie_col, '')).strip().upper()[:14]
-                if not serie:
-                    continue
-                toner_lookup[serie] = {
-                    'toner_bk': str(row[col_bk]).strip() if col_bk and pd.notna(row.get(col_bk)) else '',
-                    'toner_cy': str(row[col_cy]).strip() if col_cy and pd.notna(row.get(col_cy)) else '',
-                    'toner_mg': str(row[col_mg]).strip() if col_mg and pd.notna(row.get(col_mg)) else '',
-                    'toner_yw': str(row[col_yw]).strip() if col_yw and pd.notna(row.get(col_yw)) else '',
-                }
-
-    # Enrich MAPA rows
-    result = []
-    for row in mapa_rows:
-        serie = str(row.get('Serie', '')).strip().upper()[:14]
-        toner = toner_lookup.get(serie, {})
-        enriched = dict(row)
-        enriched['toner_bk'] = toner.get('toner_bk', '')
-        enriched['toner_cy'] = toner.get('toner_cy', '')
-        enriched['toner_mg'] = toner.get('toner_mg', '')
-        enriched['toner_yw'] = toner.get('toner_yw', '')
-        # LocalInstalacao: se vazio, usar RuaRef como fallback (dados podem estar em qualquer um dos dois)
-        local = enriched.get('LocalInstalacao', '').strip()
-        rua = enriched.get('RuaRef', '').strip()
-        if not local:
-            enriched['LocalInstalacao'] = rua
-        elif not rua:
-            enriched['RuaRef'] = local
-        result.append(enriched)
-
-    return result
 
 @router.get("/assist/route_equipment")
 def get_route_equipment(route: str, session: ContractSession = Depends(get_authorized_session)):
@@ -207,15 +121,8 @@ def get_filter_options(session: ContractSession = Depends(get_authorized_session
 
 @router.get("/mapa")
 def get_mapa(limit: int = 5000, session: ContractSession = Depends(get_authorized_session)):
-    # Direct DB access needs contract_id from session
-    df = database.load_mapa(session.contract_id)
-    
-    # Use Central Adapter
-    try:
-        from ..core import adapters
-    except (ImportError, ValueError):
-        from core import adapters
-    return adapters.normalize_dataframe(df.head(limit))
+    df = database.load_normalized("MAPA", session.contract_id)
+    return df.head(limit).to_dict(orient="records")
 
 @router.post("/mapa/unique/{field}")
 def get_mapa_unique_values(field: str, payload: dict, session: ContractSession = Depends(get_authorized_session)):
@@ -224,17 +131,13 @@ def get_mapa_unique_values(field: str, payload: dict, session: ContractSession =
 
 @router.get("/papel")
 def get_papel(limit: int = 10, session: ContractSession = Depends(get_authorized_session)):
-    df = database.load_papel(session.contract_id)
-    # Use Central Adapter
-    from ..core import adapters
-    return adapters.normalize_dataframe(df.head(limit))
+    df = database.load_normalized("PAPEL", session.contract_id)
+    return df.head(limit).to_dict(orient="records")
 
 @router.get("/contadores")
 def get_contadores(limit: int = 5000, session: ContractSession = Depends(get_authorized_session)):
-    df = database.load_contadores(session.contract_id)
-    # Use Central Adapter
-    from ..core import adapters
-    return adapters.normalize_dataframe(df.head(limit))
+    df = database.load_normalized("CONTADORES", session.contract_id)
+    return df.head(limit).to_dict(orient="records")
 
 @router.get("/entregas/{protocol_id}")
 def get_protocol(protocol_id: int, session: ContractSession = Depends(get_authorized_session)):

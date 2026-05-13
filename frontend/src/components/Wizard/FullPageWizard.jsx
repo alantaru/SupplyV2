@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, ArrowRight, Loader, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthProvider';
@@ -29,7 +29,7 @@ export default function FullPageWizard() {
             // 2. Redirect to Setup Wizard -> setup-contract (Base Configuration)
             navigate(`/setup-contract/${formData.id}`);
 
-        } catch (err) {
+        } catch (_err) {
 
             setError(err.response?.data?.detail || "Erro ao criar contrato. Verifique se o ID já existe.");
         } finally {

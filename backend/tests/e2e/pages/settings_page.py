@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from playwright.sync_api import Page, Locator, FilePayload, expect
+from playwright.sync_api import Locator
 
 from .base_page import BasePage
 

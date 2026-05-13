@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthProvider';
 import api from '../../lib/api';
@@ -59,7 +59,9 @@ export default function History() {
                     empresas: Array.isArray(res.data.empresas) ? res.data.empresas : []
                 });
             }
-        } catch (error) { /* Silent: filter options non-critical */ }
+        } catch (_error) {
+            console.warn("Failed to fetch filter options:", _error);
+        }
     };
 
     const loadHistory = async () => {
@@ -84,7 +86,8 @@ export default function History() {
             } else {
                 setProtocols([]);
             }
-        } catch (error) {
+        } catch (_error) {
+            console.error("Failed to load history:", _error);
             setProtocols([]);
         } finally {
             setLoading(false);
@@ -95,7 +98,8 @@ export default function History() {
         try {
             const res = await api.get(`/data/entregas/${protocolId}`);
             setSelectedProtocol(res.data);
-        } catch (error) {
+        } catch (_error) {
+            console.error("Failed to fetch protocol details:", _error);
             addToast("Erro ao carregar detalhes do protocolo.", "error");
         }
     };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../../context/ToastContext';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthProvider';
@@ -56,9 +56,6 @@ export default function StockDashboard() {
     const [adjustReason, setAdjustReason] = useState('');
     const [adjustCode, setAdjustCode] = useState('');
 
-    // Edit Item Modal
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [editItemData, setEditItemData] = useState({ original_item: '', new_item: '', code: '', empresa: '' });
 
     // Modal bifurcado: null | 'select' | 'new-item' | 'adjustment'
     const [modalMode, setModalMode] = useState(null);
@@ -118,8 +115,8 @@ export default function StockDashboard() {
             addToast('Item criado com sucesso!', 'success');
             closeModal();
             fetchData();
-        } catch (err) {
-            const msg = err.response?.data?.detail || 'Erro ao criar item';
+        } catch (_err) {
+            const msg = _err.response?.data?.detail || 'Erro ao criar item';
             addToast(msg, 'error');
             // Não fecha o modal em caso de erro
         } finally {
@@ -128,12 +125,9 @@ export default function StockDashboard() {
     };
 
 
-    // Robustly extract contract ID (supports String or Object)
-    const contractId = typeof activeContract === 'string'
-        ? activeContract
-        : activeContract?.contract_id || activeContract?.id; // fallback
+    const contractId = user?.activeContract;
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         if (!contractId) return;
         setLoading(true);
         setError(null);
@@ -144,18 +138,18 @@ export default function StockDashboard() {
             ]);
             setLevels(Array.isArray(resLevels.data) ? resLevels.data : []);
             setHistory(Array.isArray(resHistory.data) ? resHistory.data : []);
-        } catch (err) {
+        } catch (_err) {
             setError("Falha ao carregar dados de estoque");
             setLevels([]);
             setHistory([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, [contractId]);
 
     useEffect(() => {
         fetchData();
-    }, [contractId]);
+    }, [fetchData]);
 
     const handleAdjust = async (extraData = {}) => {
         if (!adjustItem || adjustQty === 0) return;
@@ -179,7 +173,7 @@ export default function StockDashboard() {
             setAdjustReason('');
             setAdjustCode('');
             fetchData();
-        } catch (err) {
+        } catch (_err) {
             addToast("Falha ao ajustar estoque", "error");
         }
     };
@@ -227,7 +221,7 @@ export default function StockDashboard() {
 
             await fetchData();
             cancelEditing();
-        } catch (err) {
+        } catch (_err) {
             addToast("Erro ao salvar ajuste.", "error");
         } finally {
             setEditSaving(false);
@@ -252,7 +246,7 @@ export default function StockDashboard() {
             setShowDeleteModal(false);
             setItemToDelete(null);
             fetchData();
-        } catch (err) {
+        } catch (_err) {
             addToast("Falha ao deletar item.", "error");
         }
     };
@@ -270,23 +264,6 @@ export default function StockDashboard() {
     const { widths: levelsWidths, setColumnWidth: setLevelsWidth } = useColumnWidths(`supply_stock_levels_cols_${user?.username}_${contractId}`);
     const { widths: historyWidths, setColumnWidth: setHistoryWidth } = useColumnWidths(`supply_stock_history_cols_${user?.username}_${contractId}`);
 
-    const handleExportLevels = () => {
-        downloadFileFromAPI('/export/stock/levels', 'estoque_geral.csv', { contract_id: contractId });
-    };
-
-    const handleExportHistory = () => {
-        downloadFileFromAPI('/export/stock/history', 'historico_movimentacoes.csv', { contract_id: contractId });
-    };
-
-    const handleUpdateDetails = async () => {
-        try {
-            await api.put('stock/item', editItemData, { params: { contract_id: contractId } });
-            setShowEditModal(false);
-            fetchData();
-        } catch (err) {
-            addToast("Erro ao atualizar item.", "error");
-        }
-    };
 
     return (
         <div className="space-y-6 flex flex-col h-full animate-in fade-in duration-500">

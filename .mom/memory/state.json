@@ -1,0 +1,15 @@
+{
+  "last_audit": "2026-05-08T20:48:00-03:00",
+  "status": "CRITICAL_QUALITY_DEBT",
+  "metrics": {
+    "backend_coverage": "40.71%",
+    "lint_errors": 21,
+    "failing_tests": 5,
+    "node_version": "v20.11.1"
+  },
+  "blockers": {
+    "frontend_tests": "Node version v20 incompatible with Vitest v2. Require upgrade to v22+.",
+    "refinery_upload": "Logic errors in test_logic_upload.py (AttributeError) and test_ingestor.py (AssertionError)."
+  },
+  "real_context": "The system is functioning but has significant technical debt. Previous session logs overestimated quality metrics. Current priority is stabilization before feature development."
+}

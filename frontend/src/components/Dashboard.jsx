@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthProvider';
@@ -50,14 +50,9 @@ export default function Dashboard() {
     const { columns, setColumns, visibleColumns } = useColumns(`supply_dash_cols_${user?.username}_${activeContract}`, DASH_DEFAULT_COLUMNS);
     const { widths, setColumnWidth } = useColumnWidths(`supply_dash_cols_${user?.username}_${activeContract}`);
 
-    useEffect(() => {
-        fetchProtocols();
-        fetchFilterOptions();
-    }, [filters, search, activeContract]); // Added activeContract to deps if it changes without reload
-
-    const fetchFilterOptions = async () => {
+    const fetchFilterOptions = useCallback(async () => {
         try {
-            const res = await api.get('/data/entregas/filter-options');
+            const res = await api.get('data/entregas/filter-options');
             if (res.data && typeof res.data === 'object') {
                 setFilterOptions({
                     cidades: Array.isArray(res.data.cidades) ? res.data.cidades : [],
@@ -65,12 +60,12 @@ export default function Dashboard() {
                     empresas: Array.isArray(res.data.empresas) ? res.data.empresas : []
                 });
             }
-        } catch (error) {
+        } catch (_error) {
             // Silent: filter options are non-critical
         }
-    };
+    }, []);
 
-    const fetchProtocols = async () => {
+    const fetchProtocols = useCallback(async () => {
         try {
             setLoading(true);
             const params = new URLSearchParams({
@@ -82,18 +77,23 @@ export default function Dashboard() {
                 search: search,
                 contract_id: activeContract
             });
-            const response = await api.get(`/data/entregas?${params.toString()}`);
+            const response = await api.get(`data/entregas?${params.toString()}`);
             if (Array.isArray(response.data)) {
                 setProtocols(response.data);
             } else {
                 setProtocols([]);
             }
-        } catch (error) {
+        } catch (_error) {
             setProtocols([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, [filters, search, activeContract]);
+
+    useEffect(() => {
+        fetchProtocols();
+        fetchFilterOptions();
+    }, [fetchProtocols, fetchFilterOptions]);
 
     const handleSearch = (e) => setSearch(e.target.value);
 

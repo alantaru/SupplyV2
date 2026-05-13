@@ -38,7 +38,9 @@ async def get_authorized_session(
         
     # Admin Override: Admins can access any contract
     if user.role in ["admin", "superadmin"]:
-        return ContractSession(target_id)
+        session = ContractSession(target_id)
+        session.user = user
+        return session
         
     # Access Control
     # Ensure user.contracts is a list
@@ -47,4 +49,6 @@ async def get_authorized_session(
     if target_id not in user_contracts:
         raise HTTPException(status_code=403, detail=f"Access denied to contract {target_id}")
         
-    return ContractSession(target_id)
+    session = ContractSession(target_id)
+    session.user = user
+    return session

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 
 export default function GenericDeleteModal({ 
@@ -7,11 +7,14 @@ export default function GenericDeleteModal({
     targetId, 
     onClose, 
     onConfirm,
+    onCancel,              // optional: custom cancel action (falls back to onClose)
     icon: Icon = Trash2,
     confirmLabel = "Confirmar Exclusão",
+    cancelLabel = "Cancelar",
     variant = "danger",
-    requireTyping = true   // false = apenas botões, sem campo de texto
+    requireTyping = false   // false = apenas botões, sem campo de texto
 }) {
+    const handleCancel = onCancel || onClose;
     const [typedId, setTypedId] = useState('');
     const isValid = requireTyping
         ? String(typedId).trim().toLowerCase() === String(targetId || '---').trim().toLowerCase()
@@ -74,10 +77,10 @@ export default function GenericDeleteModal({
 
                 <div className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700 p-6 flex gap-3">
                     <button
-                        onClick={onClose}
+                        onClick={handleCancel}
                         className="flex-1 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all"
                     >
-                        Cancelar
+                        {cancelLabel}
                     </button>
                     <button
                         disabled={!isValid}

@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Columns, Check, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 
 export default function ColumnManager({ columns, onChange }) {
     const [isOpen, setIsOpen] = useState(false);
     const [dragOverIndex, setDragOverIndex] = useState(null);
+    const [draggedIndex, setDraggedIndex] = useState(null);
     const dropdownRef = useRef(null);
-    const dragIndexRef = useRef(null);
+    const dragIndexRef = useRef(null); // Keep ref for drop calculation if needed, or just use draggedIndex
 
     // Close on outside click
     useEffect(() => {
@@ -43,6 +44,7 @@ export default function ColumnManager({ columns, onChange }) {
     // Drag-and-drop handlers
     const handleDragStart = (e, index) => {
         dragIndexRef.current = index;
+        setDraggedIndex(index);
         e.dataTransfer.effectAllowed = 'move';
         // Minimal ghost image
         e.dataTransfer.setDragImage(e.currentTarget, 12, 12);
@@ -59,6 +61,7 @@ export default function ColumnManager({ columns, onChange }) {
         const fromIndex = dragIndexRef.current;
         if (fromIndex === null || fromIndex === toIndex) {
             setDragOverIndex(null);
+            setDraggedIndex(null);
             return;
         }
         const newCols = [...columns];
@@ -67,11 +70,13 @@ export default function ColumnManager({ columns, onChange }) {
         onChange(newCols);
         dragIndexRef.current = null;
         setDragOverIndex(null);
+        setDraggedIndex(null);
     };
 
     const handleDragEnd = () => {
         dragIndexRef.current = null;
         setDragOverIndex(null);
+        setDraggedIndex(null);
     };
 
     return (
@@ -107,10 +112,10 @@ export default function ColumnManager({ columns, onChange }) {
                                 onDrop={(e) => handleDrop(e, index)}
                                 onDragEnd={handleDragEnd}
                                 className={`flex items-center justify-between p-1.5 rounded-lg transition-colors group ${
-                                    dragOverIndex === index && dragIndexRef.current !== index
+                                    dragOverIndex === index && draggedIndex !== index
                                         ? 'bg-primary/10 border border-primary/30'
                                         : 'hover:bg-slate-50 dark:hover:bg-slate-800 border border-transparent'
-                                } ${dragIndexRef.current === index ? 'opacity-40' : 'opacity-100'}`}
+                                } ${draggedIndex === index ? 'opacity-40' : 'opacity-100'}`}
                             >
                                 {/* Drag handle */}
                                 <div className="cursor-grab active:cursor-grabbing text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 mr-1 shrink-0">

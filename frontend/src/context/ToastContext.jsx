@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 const ToastContext = createContext(null);
@@ -14,6 +14,10 @@ export const useToast = () => {
 export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);
 
+    const removeToast = useCallback((id) => {
+        setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
+    }, []);
+
     const addToast = useCallback((message, type = 'info', duration = 4000) => {
         const id = Math.random().toString(36).substring(2, 9);
         const toast = { id, message, type, duration };
@@ -25,7 +29,7 @@ export const ToastProvider = ({ children }) => {
                 removeToast(id);
             }, duration);
         }
-    }, []);
+    }, [removeToast]);
 
     useEffect(() => {
         const handleGlobalToast = (event) => {
@@ -35,10 +39,6 @@ export const ToastProvider = ({ children }) => {
         window.addEventListener('add-toast', handleGlobalToast);
         return () => window.removeEventListener('add-toast', handleGlobalToast);
     }, [addToast]);
-
-    const removeToast = useCallback((id) => {
-        setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
-    }, []);
 
     const getIcon = (type) => {
         switch (type) {

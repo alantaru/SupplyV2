@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import { Save, Loader, AlertTriangle, History, X, UserPlus } from 'lucide-react';
@@ -66,7 +66,7 @@ export default function FormStep({ data, type, activeContract }) {
     useEffect(() => {
         const loadMappings = async () => {
             try {
-                const res = await api.get('/data/mappings');
+                const res = await api.get('data/mappings');
                 const mapaExtras = res.data.MAPA?.EXTRAS || [];
                 setExtraMappings(mapaExtras);
                 const initialExtras = {};
@@ -439,7 +439,7 @@ export default function FormStep({ data, type, activeContract }) {
                 <SolicitanteFormModal
                     mode="create"
                     onSave={async ({ nome, ramal, obs }) => {
-                        await api.post('/data/solicitantes', { nome, ramal, obs }, { params: { contract_id: activeContract } });
+                        await api.post('data/solicitantes', { nome, ramal, obs }, { params: { contract_id: activeContract } });
                         setForm(p => ({ ...p, solicitante: nome, telefone: ramal || p.telefone }));
                     }}
                     onClose={() => setShowAddSolicitante(false)}

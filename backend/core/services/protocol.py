@@ -20,119 +20,50 @@ class ProtocolService:
         self.contract_id = contract_id
 
     def get_pending(self, limit: int = 50, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        # Combined logic of get_pending_entregas and get_pending_entregas_filtered
-        df = database.load_entregas(self.contract_id)
-        
-        # Use Adapter (Universal Import)
-        try:
-            from .. import adapters
-        except (ImportError, ValueError):
-            from core import adapters
-        if not df.empty:
-            df = pd.DataFrame(adapters.normalize_dataframe(df))
-        
+        df = database.load_normalized("ENTREGAS", self.contract_id)
         if df.empty:
             return []
         
-        # Filter Logic
-        filtered = df
+        filtered = self._apply_filters(df, filters)
         
-        # Check status filter
-        status_filter = 'pending'
-        if filters and 'status' in filters:
-            status_filter = filters['status']
-            
-        if 'DataEntrega' in df.columns:
-            data_entrega = df['DataEntrega'].astype(str).str.strip().str.lower().replace('nan', '')
-            if status_filter == 'pending':
-                filtered = df[data_entrega == '']
-            elif status_filter == 'delivered':
-                filtered = df[data_entrega != '']
-            # else 'all' -> no filter on DataEntrega
-
-        # Apply other filters if any
-        if filters:
-             if 'city' in filters and filters['city']:
-                 filtered = filtered[filtered['Cidade'].astype(str) == filters['city']]
-             if 'fila' in filters and filters['fila']:
-                 filtered = filtered[filtered['Fila'].astype(str) == filters['fila']]
-             if 'empresa' in filters and filters['empresa']:
-                 filtered = filtered[filtered['Empresa'].astype(str) == filters['empresa']]
-             if 'search' in filters and filters['search']:
-                 s = str(filters['search']).lower()
-                 filtered = filtered[
-                     filtered['Protocolo'].astype(str).str.contains(s) |
-                     filtered['Serie'].astype(str).str.lower().str.contains(s)
-                 ]
-
-             # Date Range Filter (DataEntrega)
-             if 'start_date' in filters or 'end_date' in filters:
-                 # Ensure column exists and is parsed
-                 if 'DataEntrega' in filtered.columns:
-                     # Convert to datetime for comparison, coerce errors to NaT
-                     # Assume format DD/MM/YYYY
-                     dates = pd.to_datetime(filtered['DataEntrega'], format='%d/%m/%Y', errors='coerce')
-                     
-                     if filters.get('start_date'):
-                        try:
-                            start = pd.to_datetime(filters['start_date'], format='%Y-%m-%d') # Input from UI is YYYY-MM-DD
-                            filtered = filtered[dates >= start]
-                            dates = dates[dates >= start] # Keep sync
-                        except Exception:
-                            pass
-                     
-                     if filters.get('end_date'):
-                        try:
-                            end = pd.to_datetime(filters['end_date'], format='%Y-%m-%d')
-                            end = end.replace(hour=23, minute=59, second=59)
-                            filtered = filtered[filtered.index.isin(dates.index)] # Ensure sync
-                            filtered = filtered[pd.to_datetime(filtered['DataEntrega'], format='%d/%m/%Y', errors='coerce') <= end]
-                        except Exception:
-                            pass
-
-        # Sort
         if 'Protocolo' in filtered.columns:
             try:
                 filtered = filtered.sort_values('Protocolo', ascending=False)
             except Exception:
                 pass
             
-        # Clean up internal columns before returning dict
         result_df = filtered.head(limit).fillna("").copy()
-        if 'Protocolo_Num' in result_df.columns:
-            result_df = result_df.drop(columns=['Protocolo_Num'])
-            
         return result_df.to_dict(orient="records")
 
     def get_export(self, filters: Dict[str, Any] = None) -> str:
-        # Reuse get_pending logic but without limit and return CSV string
-        # We can refactor get_pending to separate "get_dataframe" later, 
-        # but for now we essentially replicate the loading/filtering or call a shared private method.
-        # To avoid code duplication, let's call get_pending with a very large limit? 
-        # Or better: Extract logic. For safety now, reusing get_pending logic (copy-paste-modify safe refactor).
-        
-        df = database.load_entregas(self.contract_id)
-        try:
-            from .. import adapters
-        except (ImportError, ValueError):
-            from core import adapters
-        if not df.empty:
-            df = pd.DataFrame(adapters.normalize_dataframe(df))
-        
+        df = database.load_normalized("ENTREGAS", self.contract_id)
         if df.empty:
             return ""
         
-        filtered = df
+        filtered = self._apply_filters(df, filters)
         
-        # --- REPLICATE FILTER LOGIC START (Simplified copy of get_pending core) ---
-        status_filter = filters.get('status', 'pending')
+        if 'Protocolo' in filtered.columns:
+             try:
+                 filtered = filtered.sort_values('Protocolo', ascending=False)
+             except Exception:
+                 pass
+
+        return filtered.to_csv(sep=';', index=False, encoding='utf-8-sig')
+
+    def _apply_filters(self, df: pd.DataFrame, filters: Dict[str, Any] = None) -> pd.DataFrame:
+        if df.empty:
+            return df
+            
+        filtered = df
+        status_filter = filters.get('status', 'pending') if filters else 'pending'
+            
         if 'DataEntrega' in df.columns:
             data_entrega = df['DataEntrega'].astype(str).str.strip().str.lower().replace('nan', '')
             if status_filter == 'pending':
                 filtered = df[data_entrega == '']
             elif status_filter == 'delivered':
                 filtered = df[data_entrega != '']
-        
+
         if filters:
              if filters.get('city'):
                  filtered = filtered[filtered['Cidade'].astype(str) == filters['city']]
@@ -146,45 +77,29 @@ class ProtocolService:
                      filtered['Protocolo'].astype(str).str.contains(s) |
                      filtered['Serie'].astype(str).str.lower().str.contains(s)
                  ]
-             
-             # Date Filters
+
              if 'start_date' in filters or 'end_date' in filters:
                  if 'DataEntrega' in filtered.columns:
                      dates = pd.to_datetime(filtered['DataEntrega'], format='%d/%m/%Y', errors='coerce')
+                     
                      if filters.get('start_date'):
                         try:
                             start = pd.to_datetime(filters['start_date'], format='%Y-%m-%d')
                             filtered = filtered[dates >= start]
-                            dates = dates[filtered.index] # Re-align
+                            dates = dates[filtered.index.isin(dates.index)]
                         except Exception:
                             pass
+                     
                      if filters.get('end_date'):
                         try:
                             end = pd.to_datetime(filters['end_date'], format='%Y-%m-%d').replace(hour=23, minute=59, second=59)
-                            filtered = filtered[dates <= end]
+                            filtered = filtered[pd.to_datetime(filtered['DataEntrega'], format='%d/%m/%Y', errors='coerce') <= end]
                         except Exception:
                             pass
-
-        # Sort
-        if 'Protocolo' in filtered.columns:
-             try:
-                 filtered = filtered.sort_values('Protocolo', ascending=False)
-             except Exception:
-                 pass
-        # --- FILTER LOGIC END ---
-
-        return filtered.to_csv(sep=';', index=False, encoding='utf-8-sig')
+        return filtered
 
     def get_by_id(self, protocol_id: int) -> Dict[str, Any]:
-        df = database.load_entregas(self.contract_id)
-        
-        # Use Adapter
-        try:
-            from .. import adapters
-        except (ImportError, ValueError):
-            from core import adapters
-        if not df.empty:
-            df = pd.DataFrame(adapters.normalize_dataframe(df))
+        df = database.load_normalized("ENTREGAS", self.contract_id)
         
         if df.empty or 'Protocolo' not in df.columns:
             return {}
@@ -199,15 +114,7 @@ class ProtocolService:
         return protocol
 
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        df = database.load_entregas(self.contract_id)
-        
-        # Use Adapter
-        try:
-            from .. import adapters
-        except (ImportError, ValueError):
-            from core import adapters
-        if not df.empty:
-            df = pd.DataFrame(adapters.normalize_dataframe(df))
+        df = database.load_normalized("ENTREGAS", self.contract_id)
         
         new_id = 1
         if not df.empty and 'Protocolo' in df.columns:
@@ -584,6 +491,15 @@ class ProtocolService:
         func = data.get("Funcionario") or data.get("user", "")
         if func:
             df_entregas.at[idx, "Funcionario"] = func
+
+        # Campos opcionais editáveis na baixa
+        for field_name in ["IncidenteRds", "Almoxarifado"]:
+            val = data.get(field_name)
+            if val is not None and str(val).strip():
+                if field_name not in df_entregas.columns:
+                    df_entregas[field_name] = ""
+                df_entregas[field_name] = df_entregas[field_name].astype(object)
+                df_entregas.at[idx, field_name] = str(val).strip()
 
         uri_entregas = database.get_data_uri("ENTREGAS", self.contract_id)
         database.save_dataframe_csv(df_entregas.drop(columns=["Protocolo_Num"]), uri_entregas)

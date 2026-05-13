@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Search, Link, Loader2 } from 'lucide-react';
 import api from '../../lib/api';
 
@@ -47,7 +47,7 @@ export default function MapaAssociateModal({ solicitante, onAssociate, onClose }
         try {
             await onAssociate(serie);
             onClose();
-        } catch (err) {
+        } catch (_err) {
             // error handled by parent
         } finally {
             setAssociating(null);

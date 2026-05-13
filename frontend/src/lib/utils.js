@@ -80,11 +80,9 @@ export const downloadFileFromAPI = async (endpoint, filename, params = {}, metho
                 if (saveResponse.ok) {
                     globalToast(`Arquivo salvo em: ${finalFilename}`, "success");
                     return; // SUCCESS: Exit early
-                } else {
-
                 }
-            } catch (err) {
-
+            } catch (_err) {
+                console.error("Local save failed, falling back to browser download:", _err);
             }
         }
 
@@ -98,8 +96,8 @@ export const downloadFileFromAPI = async (endpoint, filename, params = {}, metho
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-    } catch (error) {
-
+    } catch (_error) {
+        console.error("Download failed:", _error);
         globalToast("Falha ao baixar arquivo. Tente novamente.", "error");
     }
 };

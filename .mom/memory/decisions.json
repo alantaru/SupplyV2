@@ -1,0 +1,44 @@
+[
+  {
+    "date": "2026-05-08",
+    "decision": "Implementation of Architectural Safety Warning in DB_LOCK",
+    "rationale": "threading.Lock is insufficient for multi-worker uvicorn. Added warning to prevent silent data corruption in production.",
+    "status": "HARDENED"
+  },
+  {
+    "date": "2026-05-08",
+    "decision": "Decoupling Serial Truncation from Core Logic",
+    "rationale": "Magic number 14 was a risk for data loss on contracts with longer serials. Moved to config.MAX_SERIAL_LENGTH.",
+    "status": "REFACTORED"
+  },
+  {
+    "date": "2026-05-08",
+    "decision": "Adoption of Absolute Brain Mapping (MOM)",
+    "rationale": "Eliminate architectural drift and reliance on stale logs by creating persistent JSON-based system awareness.",
+    "status": "ACTIVE"
+  },
+  {
+    "date": "2026-05-11",
+    "decision": "Persona Segregation (insumos vs manutencao)",
+    "rationale": "Isolate operational panels; Role 'insumos' for supplies, 'manutencao' for technical field work.",
+    "status": "COMPLETED"
+  },
+  {
+    "date": "2026-05-11",
+    "decision": "10-Day Backup Rule Enforcement",
+    "rationale": "Contractual SLA tracking for field backup returns via DataEntradaManutencao calculation.",
+    "status": "COMPLETED"
+  },
+  {
+    "date": "2026-05-11",
+    "decision": "Backend Service Layer Consolidation",
+    "rationale": "Move data joining and enrichment logic from API Routers to EquipmentService to ensure thin routers and testable business logic.",
+    "status": "COMPLETED"
+  },
+  {
+    "date": "2026-05-11",
+    "decision": "Role Naming Alignment (Frontend/Backend)",
+    "rationale": "Unified role 'insumos' (plural) to match App.jsx RBAC and sidebar filtering requirements.",
+    "status": "RESOLVED"
+  }
+]

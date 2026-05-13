@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, CheckCircle, AlertCircle, ArrowRight, Loader } from 'lucide-react';
@@ -12,7 +12,7 @@ export default function ContractSetupWizard() {
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeStep, setActiveStep] = useState(0);
-    const processedRef = React.useRef(false);
+    const processedRef = useRef(false);
 
     // Steps configuration
     const steps = [
@@ -46,9 +46,9 @@ export default function ContractSetupWizard() {
         };
         
         syncAndLoad();
-    }, [contractId, user?.activeContract, user?.contracts?.length]); // Modified dependency array
+    }, [contractId, user, updateActiveContract, refreshUser, loadStatus]); // Modified dependency array
 
-    const loadStatus = async () => {
+    const loadStatus = useCallback(async () => {
         try {
             setLoading(true);
             const res = await api.get(`/admin/contracts/${contractId}/status`);
@@ -59,13 +59,13 @@ export default function ContractSetupWizard() {
                 determineInitialStep(res.data);
                 processedRef.current = true;
             }
-        } catch (e) {
+        } catch (_e) {
 
             addToast("Erro ao carregar status do contrato", "error");
         } finally {
             setLoading(false);
         }
-    };
+    }, [contractId, addToast]);
 
     const determineInitialStep = (s) => {
         // If entirely new (no files), Start at Welcome (0)
@@ -241,9 +241,8 @@ function UploadStep({ title, description, fileKey, contractId, onSuccess, hasFil
             } else {
                 addToast("Resposta desconhecida do servidor: " + JSON.stringify(res.data), "info");
             }
-        } catch (err) {
-
-            addToast("Erro no upload: " + (err.response?.data?.detail || err.message), "error");
+        } catch (_err) {
+            addToast("Erro no upload: " + (_err.response?.data?.detail || _err.message), "error");
         } finally {
             setUploading(false);
         }
@@ -261,8 +260,8 @@ function UploadStep({ title, description, fileKey, contractId, onSuccess, hasFil
             } else {
                 addToast("Erro ao aplicar mapeamento: resposta inesperada do servidor.", "error");
             }
-        } catch (err) {
-            addToast("Erro ao aplicar mapeamento: " + (err.response?.data?.detail || err.message), "error");
+        } catch (_err) {
+            addToast("Erro ao aplicar mapeamento: " + (_err.response?.data?.detail || _err.message), "error");
         } finally {
             setUploading(false);
         }
@@ -326,7 +325,6 @@ function UploadStep({ title, description, fileKey, contractId, onSuccess, hasFil
 }
 
 function FinishStep({ navigate, contractId }) {
-    const { addToast } = useToast();
     return (
         <div className="text-center space-y-6">
             <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center">

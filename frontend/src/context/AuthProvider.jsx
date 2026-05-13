@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../lib/api';
 
 const AuthContext = createContext(null);
@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    const parseJwt = (token) => {
+    const parseJwt = useCallback((token) => {
         if (!token) return null;
         try {
             const base64Url = token.split('.')[1];
@@ -19,12 +19,12 @@ export const AuthProvider = ({ children }) => {
                 return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
             }).join(''));
             return JSON.parse(jsonPayload);
-        } catch (e) {
+        } catch (_e) {
             return null;
         }
-    };
+    }, []);
 
-    const setUserFromToken = (token) => {
+    const setUserFromToken = useCallback((token) => {
         const decoded = parseJwt(token);
         if (decoded) {
             const contracts = decoded.contracts || [];
@@ -48,7 +48,6 @@ export const AuthProvider = ({ children }) => {
                 initial_route: decoded.initial_route || '/',
                 contracts: contracts,
                 activeContract: activeContract,
-                contract_id: activeContract,
                 theme: decoded.theme || 'light',
                 accent: decoded.accent || 'indigo',
                 avatar: decoded.avatar || 'default'
@@ -62,7 +61,7 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             localStorage.removeItem('token');
         }
-    };
+    }, [parseJwt]);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -94,14 +93,15 @@ export const AuthProvider = ({ children }) => {
                             ...res.data,
                             contracts: newContracts,
                             activeContract,
-                            contract_id: activeContract,
                         };
                     });
                 })
-                .catch(() => {});
+                .catch((_err) => {
+                    console.warn("Silent token refresh failed.");
+                });
         }
         setLoading(false);
-    }, []);
+    }, [setUserFromToken]);
 
     const login = async (username, password) => {
         // Use URLSearchParams to force application/x-www-form-urlencoded
@@ -119,8 +119,8 @@ export const AuthProvider = ({ children }) => {
 
             const decoded = parseJwt(access_token);
             return { success: true, route: decoded?.initial_route || '/' };
-        } catch (error) {
-            return { success: false, msg: error?.response?.data?.detail || "Usuário ou senha inválidos" };
+        } catch (_error) {
+            return { success: false, msg: _error?.response?.data?.detail || "Usuário ou senha inválidos" };
         }
     };
 
@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }) => {
 
     const updateActiveContract = (contractId) => {
         localStorage.setItem('active_contract', contractId);
-        setUser(prev => prev ? { ...prev, activeContract: contractId, contract_id: contractId } : prev);
+        setUser(prev => prev ? { ...prev, activeContract: contractId } : prev);
     };
 
     const refreshUser = async () => {
@@ -139,7 +139,8 @@ export const AuthProvider = ({ children }) => {
             const res = await api.get('auth/me');
             setUser(prev => ({ ...prev, ...res.data }));
             return res.data;
-        } catch (err) {
+        } catch (_err) {
+            console.error("Failed to refresh user data:", _err);
             return null;
         }
     };

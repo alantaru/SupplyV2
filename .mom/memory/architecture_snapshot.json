@@ -1,0 +1,35 @@
+{
+  "system_name": "Supply_2026",
+  "version": "3.1.0",
+  "architecture_type": "No-DB SaaS (CSV on S3)",
+  "core_domains": {
+    "Refinery": {
+      "purpose": "Universal CSV/Excel Translator & Ingestion Pipeline",
+      "modules": ["ingestor.py", "mapper.py", "normalizer.py", "validator.py"],
+      "key_feature": "Cortex ML for persistent column mapping; RefineryCortex learning feedback loop"
+    },
+    "Maintenance": {
+      "purpose": "Technical Field Operations & SLA Monitoring",
+      "modules": ["maintenance.py", "equipment.py"],
+      "key_feature": "10-day Backup SLA; Mandatory Counter-Proof Upload; Map Divergence Reconciliation"
+    },
+    "SmartStock": {
+      "purpose": "Automatic, thread-safe stock management",
+      "logic": "Automatic resolution of A4/A3/Toner items; negative balance support",
+      "concurrency": "database.DB_LOCK based exclusion"
+    },
+    "Storage": {
+      "purpose": "Unified Abstraction (fsspec) for S3 and Local storage",
+      "key_prefixes": ["refinery/", "temp/", "backups/", "uploads/", "logs/"]
+    },
+    "Auth": {
+      "purpose": "JWT based with PBKDF2 hashing",
+      "roles": ["superadmin", "admin", "insumos", "manutencao"]
+    }
+  },
+  "data_flows": {
+    "RefineryPipeline": "Upload -> Ingestor -> Mapper -> Storage (Normalized CSV)",
+    "ProtocolCreation": "Frontend -> ProtocolService -> Snapshot -> Entregas.csv",
+    "MaintenanceOS": "OSWizard -> Image Upload -> MAPA Update -> Teams Script Notify"
+  }
+}

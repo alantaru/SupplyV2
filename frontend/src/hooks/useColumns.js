@@ -21,8 +21,8 @@ export function useColumns(storageKey, defaultColumns) {
                 });
                 return merged;
             }
-        } catch (e) {
-            // Silent fallback to defaults
+        } catch (_e) {
+            console.error("Failed to load columns from storage:", _e);
         }
         return defaultColumns.map(c => ({ ...c, visible: true }));
     });

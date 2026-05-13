@@ -1,0 +1,17 @@
+{
+  "last_update": "2026-05-08",
+  "source": "Kiro Brain Log Recap",
+  "tasks": [
+    {"id": 1, "name": "Logo nas Folhas Imprimíveis", "status": "IN-PROGRESS", "details": "RoutePrint.jsx, ProtocolPrint.jsx pending site_logo integration"},
+    {"id": 2, "name": "Título do Browser + Aba Superadmin", "status": "DONE"},
+    {"id": 5, "name": "Equipamentos Dashboard - Cards Clicáveis", "status": "DONE"},
+    {"id": 6, "name": "Sistema de Rotas - Estudo Completo", "status": "DONE"},
+    {"id": 11, "name": "Delivery Snapshot Enrichment", "status": "SPEC-CREATED", "details": "Implementation pending"},
+    {"id": 13, "name": "Sistema Unificado de Tabelas", "status": "DONE", "details": "90% complete, PBT tests pending"},
+    {"id": 17, "name": "Backup/Restore e SPLIT de Bases", "status": "DONE"},
+    {"id": 22, "name": "Página Solicitantes/Contatos", "status": "PARTIAL", "details": "Frontend ~60% complete"},
+    {"id": 23, "name": "Testes CI/CD Completos", "status": "FAILING", "details": "Real coverage 40.71% (target 100%). 21 lint errors. 5 test failures (Refinery/Upload)."},
+    {"id": 24, "name": "Estabilização de Testes Flaky", "status": "ACTIVE", "details": "Failing: test_logic_upload.py, test_ingestor.py, test_upload_cycle_fix.py"},
+    {"id": 25, "name": "Remediação de Linting", "status": "ACTIVE", "details": "21 errors in E2E pages (F401 unused imports)"}
+  ]
+}

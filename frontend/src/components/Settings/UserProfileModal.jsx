@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { X, User, Lock, Palette, Camera, RefreshCw, Save, Check, Download, Folder, Laptop, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { downloadFileFromAPI, cn } from '../../lib/utils';
@@ -7,8 +7,6 @@ import api from '../../lib/api';
 
 export default function UserProfileModal({ isOpen, onClose, user }) {
     const { addToast } = useToast();
-    if (!isOpen) return null;
-
     const [activeTab, setActiveTab] = useState('profile');
     const { theme, toggleTheme, accent, setAccent, ACCENT_COLORS } = useTheme();
 
@@ -39,6 +37,8 @@ export default function UserProfileModal({ isOpen, onClose, user }) {
         return () => window.removeEventListener('set-user-profile-tab', handleSetTab);
     }, []);
 
+    if (!isOpen) return null;
+
     // Initial Route Options
     const routes = [
         { label: 'Painel Principal (Dashboard)', value: '/' },
@@ -57,7 +57,7 @@ export default function UserProfileModal({ isOpen, onClose, user }) {
                 try {
                     await api.put('auth/me', { avatar: base64 });
                     localStorage.setItem(`user_avatar_${user?.username}`, base64); // Fallback/Cache
-                } catch (error) {
+                } catch (_error) {
                     addToast("Erro ao salvar avatar (mas foi atualizado localmente)", "error");
                 }
             };
@@ -69,7 +69,7 @@ export default function UserProfileModal({ isOpen, onClose, user }) {
         try {
             await api.put('auth/me', { initial_route: initialRoute });
             addToast('Preferências salvas com sucesso!', "success");
-        } catch (error) {
+        } catch (_error) {
             addToast('Erro ao salvar preferências.', "error");
         }
     };
@@ -84,7 +84,7 @@ export default function UserProfileModal({ isOpen, onClose, user }) {
             });
             addToast('Senha alterada com sucesso!', "success");
             setPwdData({ old: '', new: '', confirm: '' });
-        } catch (error) {
+        } catch (_error) {
             addToast(error.response?.data?.detail || 'Erro ao alterar senha', "error");
         }
     };
@@ -96,7 +96,7 @@ export default function UserProfileModal({ isOpen, onClose, user }) {
             const res = await api.post('auth/regenerate-recovery-key', { password: recoveryPwd });
             setRecoveryKey(res.data.recovery_key);
             setRecoveryPwd('');
-        } catch (error) {
+        } catch (_error) {
             addToast(error.response?.data?.detail || 'Erro ao gerar chave', "error");
         } finally {
             setLoadingKey(false);
@@ -110,7 +110,7 @@ export default function UserProfileModal({ isOpen, onClose, user }) {
             localStorage.setItem('VITE_INTERNAL_DOWNLOAD_PATH', targetPath);
             window.INTERNAL_DOWNLOAD_AUDIT = customDestEnabled;
             addToast("Configurações de download atualizadas.", "success");
-        } catch (err) {
+        } catch (_err) {
             addToast("Erro ao salvar configurações.", "error");
         } finally {
             setTimeout(() => setIsSavingDownloads(false), 500);

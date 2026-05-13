@@ -1,14 +1,14 @@
 from typing import Optional
 try:
-    from .. import database, config
+    from .. import config
 except (ImportError, ValueError):
-    import database
     import config
 
 from .services.stock import StockService
 from .services.protocol import ProtocolService
 from .services.equipment import EquipmentService
 from .services.route import RouteService
+from .services.maintenance import MaintenanceService
 
 class ContractSession:
     """
@@ -27,3 +27,4 @@ class ContractSession:
         self.protocols = ProtocolService(self.contract_id) 
         self.equipment = EquipmentService(self.contract_id) 
         self.routes = RouteService(self.contract_id)
+        self.maintenance = MaintenanceService(self.contract_id)

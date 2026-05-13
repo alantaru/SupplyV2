@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell } from 'lucide-react';
 import { notificationService } from '../../lib/notificationService';
 import { useAuth } from '../../context/AuthProvider';
@@ -12,18 +12,18 @@ export default function NotificationBell() {
     const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
 
-    const loadNotifications = async () => {
+    const loadNotifications = useCallback(async () => {
         const notifs = await notificationService.getNotifications(activeContract);
         setNotifications(notifs);
         setUnreadCount(notifs.length); // Assuming all fetched are unread for simplicity now
-    };
+    }, [activeContract]);
 
     useEffect(() => {
         loadNotifications();
         // Poll every 60 seconds
         const interval = setInterval(loadNotifications, 60000);
         return () => clearInterval(interval);
-    }, [activeContract]);
+    }, [loadNotifications]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {

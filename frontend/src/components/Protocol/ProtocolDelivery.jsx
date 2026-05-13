@@ -44,9 +44,11 @@ export default function DeliveryModal({ protocolId, isOpen, onClose, onSuccess }
 
     const [form, setForm] = useState({
         RecebidoPor: '',
-        DataEntrega: new Date().toISOString().split('T')[0], // YYYY-MM-DD para input type=date
+        DataEntrega: new Date().toISOString().split('T')[0],
         ContadorFinal: '',
         Obs: '',
+        IncidenteRds: '',
+        Almoxarifado: '',
         Items: { A4: 0, A3: 0, TonerPreto: 0, TonerCiano: 0, TonerAmarelo: 0, TonerMagenta: 0 }
     });
 
@@ -63,9 +65,9 @@ export default function DeliveryModal({ protocolId, isOpen, onClose, onSuccess }
         if (!isOpen || !protocolId) return;
         setData(null);
         loadProtocol();
-    }, [isOpen, protocolId]);
+    }, [isOpen, protocolId, loadProtocol]);
 
-    const loadProtocol = async () => {
+    const loadProtocol = useCallback(async () => {
         try {
             setLoading(true);
             const res = await api.get(`/data/entregas/${protocolId}`);
@@ -76,6 +78,8 @@ export default function DeliveryModal({ protocolId, isOpen, onClose, onSuccess }
                 DataEntrega: new Date().toISOString().split('T')[0],
                 ContadorFinal: '',
                 Obs: '',
+                IncidenteRds: p.IncidenteRds || '',
+                Almoxarifado: p.Almoxarifado || '',
                 Items: {
                     A4:           Number(p.A4)           || 0,
                     A3:           Number(p.A3)           || 0,
@@ -90,7 +94,7 @@ export default function DeliveryModal({ protocolId, isOpen, onClose, onSuccess }
         } finally {
             setLoading(false);
         }
-    };
+    }, [protocolId, addToast]);
 
     const handleItemChange = (key, value) => {
         setForm(prev => ({ ...prev, Items: { ...prev.Items, [key]: Number(value) || 0 } }));
@@ -111,7 +115,7 @@ export default function DeliveryModal({ protocolId, isOpen, onClose, onSuccess }
             addToast('Baixa realizada com sucesso!', 'success');
             onSuccess?.();
             onClose();
-        } catch (err) {
+        } catch (_err) {
             addToast(err.response?.data?.detail || 'Erro ao realizar baixa.', 'error');
         } finally {
             setSubmitting(false);
@@ -138,7 +142,7 @@ export default function DeliveryModal({ protocolId, isOpen, onClose, onSuccess }
             addToast('Pedido cancelado com sucesso.', 'success');
             onSuccess?.();
             onClose();
-        } catch (err) {
+        } catch (_err) {
             addToast(err.response?.data?.detail || 'Erro ao cancelar pedido.', 'error');
         } finally {
             setSubmitting(false);
@@ -276,6 +280,35 @@ export default function DeliveryModal({ protocolId, isOpen, onClose, onSuccess }
                                             placeholder="Leitura do contador no momento da entrega"
                                             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                                         />
+                                    </div>
+
+                                    {/* Incidente / Requisição + Estoque no Local */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                                Nº Incidente / Requisição
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={form.IncidenteRds}
+                                                onChange={e => setForm(p => ({ ...p, IncidenteRds: e.target.value }))}
+                                                placeholder="Ex: INC0012345"
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                                Estoque no Local (resmas)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={form.Almoxarifado}
+                                                onChange={e => setForm(p => ({ ...p, Almoxarifado: e.target.value }))}
+                                                placeholder="Qtd. resmas no local"
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                            />
+                                        </div>
                                     </div>
 
                                     {/* Insumos Entregues */}

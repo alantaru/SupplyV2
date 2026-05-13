@@ -1,4 +1,3 @@
-import React from 'react';
 
 export default function LoadingSkeleton({ type = 'chart' }) {
   if (type === 'kpi') {

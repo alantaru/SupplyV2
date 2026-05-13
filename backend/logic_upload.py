@@ -1,7 +1,6 @@
 import json
 import pandas as pd
 from datetime import datetime
-from typing import Any
 from fastapi import UploadFile, HTTPException, File, Query
 import database
 from config import DEFAULT_CONTRACT
@@ -12,21 +11,18 @@ from core.refinery.cortex import RefineryCortex
 import fsspec
 
 import logging
+from core.services.maintenance import MaintenanceService
 logger = logging.getLogger(__name__)
 
 # Legacy Validations & Normalizations replaced by Refinery
 
-async def process_upload(file_key: str, file: UploadFile = File(...), contract_id: Any = Query(DEFAULT_CONTRACT), force_review: bool = False):
-    # Radical Identity Protection: Handle duplicated contract_id params from stale frontend cache
-    if isinstance(contract_id, list):
-        # Pick the most recent/relevant one (usually the one manually added)
-        contract_id = str(contract_id[-1])
-    else:
-        contract_id = str(contract_id)
-        
-    contract_id = contract_id.strip()
+async def process_upload(file_key: str, file: UploadFile = File(...), contract_id: str = Query(DEFAULT_CONTRACT), force_review: bool = False):
+    """
+    Standard process for uploading and analyzing data files via Refinery.
+    """
+    contract_id = str(contract_id).strip()
 
-    if contract_id == 'undefined' or contract_id == 'null' or not contract_id:
+    if contract_id in ['undefined', 'null', ''] or not contract_id:
          raise HTTPException(status_code=400, detail="Identificação de contrato inválida ou ausente.")
 
     try:
@@ -204,6 +200,45 @@ async def process_upload(file_key: str, file: UploadFile = File(...), contract_i
                 final_df.columns = [str(c).strip().upper() for c in final_df.columns]
                 
                 uri = database.get_data_uri(file_key, contract_id)
+                
+                # Check for Map Conflicts (Technician vs Official)
+                if file_key == "MAPA":
+                    maintenance = MaintenanceService(contract_id)
+                    divergencias = maintenance._load_divergencias()
+                    if not divergencias.empty:
+                        # Find overlapping serials/fields
+                        conflicts = []
+                        for _, div in divergencias.iterrows():
+                            serie = div["Serie"]
+                            campo = div["Campo"]
+                            valor_tecnico = div["ValorTecnico"]
+                            
+                            # Check if this serial exists in final_df
+                            official_row = final_df[final_df["SERIE"] == serie]
+                            if not official_row.empty:
+                                valor_oficial = str(official_row.iloc[0].get(campo, "N/A"))
+                                if str(valor_tecnico) != str(valor_oficial):
+                                    conflicts.append({
+                                        "Serie": serie,
+                                        "Campo": campo,
+                                        "ValorTecnico": valor_tecnico,
+                                        "ValorOficial": valor_oficial
+                                    })
+                        
+                        if conflicts:
+                            # Save the final_df to temp so we can apply chosen resolutions later
+                            temp_official_key = f"temp/OFFICIAL_MAP_{temp_filename}"
+                            temp_official_uri = database.get_storage().get_uri(temp_official_key)
+                            database.save_dataframe_csv(final_df, temp_official_uri)
+                            
+                            return {
+                                "status": "conflicts_found",
+                                "file_key": file_key,
+                                "temp_token": temp_filename,
+                                "conflicts": conflicts,
+                                "message": "Divergências encontradas entre as alterações técnicas e o mapa oficial."
+                            }
+
                 save_file(file_key, contract_id, final_df)
 
                 # Always persist the effective mapping so ColumnMappingSettings can load it.
@@ -274,8 +309,7 @@ async def process_upload(file_key: str, file: UploadFile = File(...), contract_i
              return {"status": "success", "message": "File saved (Raw)", "lines": len(df)}
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Refinery Processing failed")
         try:
             database.get_storage().delete(temp_key)
         except Exception:
@@ -533,6 +567,5 @@ def get_preview(file_key: str, contract_id: str = DEFAULT_CONTRACT):
             "columns": list(df_preview.columns)
         }
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"Preview failed for {file_key}")
         return {"exists": True, "error": f"Preview failed: {str(e)}"}

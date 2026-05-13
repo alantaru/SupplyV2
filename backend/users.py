@@ -27,6 +27,7 @@ class User(BaseModel):
     accent: str = "indigo"
     avatar: str = "default"
     created_by: Optional[str] = None
+    admin_ids: List[str] = [] # Standardized multi-admin support
 
 def load_users() -> Dict[str, UserDict]:
     with _USERS_LOCK:
@@ -42,13 +43,13 @@ def load_users() -> Dict[str, UserDict]:
 
             for u, data in raw_users.items():
                 if isinstance(data, str):
-                    # Old format - migrate to Admin
+                    # Old format - migrate to Insumo (user)
                     normalized_users[u] = {
                         "password": data,
-                        "role": "admin",
+                        "role": "insumos",
                         "contracts": [],
                         "recovery_key_hash": None,
-                        "initial_route": "/admin" # Admins default to admin panel
+                        "initial_route": "/" 
                     }
                     migrated = True
                 else:
@@ -77,13 +78,27 @@ def load_users() -> Dict[str, UserDict]:
                 save_users(normalized_users)
 
             return normalized_users
-        except Exception:
+        except Exception as e:
+            import traceback
+            print(f"CRITICAL: Failed to load users.json: {e}")
+            traceback.print_exc()
             return {}
 
 def save_users(users: Dict[str, UserDict]):
     with _USERS_LOCK:
-        with open(config.USERS_FILE, "w") as f:
-            json.dump(users, f, indent=2)
+        # Atomic write: write to temp file then rename
+        temp_file = config.USERS_FILE.with_suffix(".tmp")
+        try:
+            with open(temp_file, "w") as f:
+                json.dump(users, f, indent=2)
+            # Atomic rename (POSIX guaranteed, Windows has some caveats but better than truncate)
+            if config.USERS_FILE.exists():
+                config.USERS_FILE.unlink()
+            temp_file.rename(config.USERS_FILE)
+        except Exception as e:
+            print(f"CRITICAL: Failed to save users.json: {e}")
+            if temp_file.exists():
+                temp_file.unlink()
 
 def get_user(username: str) -> Optional[UserDict]:
     users = load_users()
@@ -95,11 +110,11 @@ def get_user_password_hash(username: str) -> Optional[str]:
         return user.get("password")
     return None
 
-def create_user(username: str, password_hash: str, role: str = "user", contracts: List[str] = [], recovery_key_hash: Optional[str] = None, initial_route: str = "/", theme: str = "light", accent: str = "indigo", avatar: str = "default", created_by: Optional[str] = None):
+def create_user(username: str, password_hash: str, role: str = "user", contracts: List[str] = [], recovery_key_hash: Optional[str] = None, initial_route: str = "/", theme: str = "light", accent: str = "indigo", avatar: str = "default", created_by: Optional[str] = None, admin_ids: Optional[List[str]] = None):
     users = load_users()
     if username in users:
         raise ValueError("User already exists")
-        
+
     users[username] = {
         "password": password_hash,
         "role": role,
@@ -109,7 +124,9 @@ def create_user(username: str, password_hash: str, role: str = "user", contracts
         "theme": theme,
         "accent": accent,
         "avatar": avatar,
-        "created_by": created_by
+        "created_by": created_by,
+        # Multi-admin support: admin_ids is the authoritative list
+        "admin_ids": admin_ids if admin_ids is not None else ([created_by] if created_by else [])
     }
     save_users(users)
 

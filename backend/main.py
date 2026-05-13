@@ -2,9 +2,9 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 try:
-    from .routers import auth, data, admin, stock, upload, archive, routes, export, refinery, debug, bi, solicitantes
+    from .routers import auth, data, admin, stock, upload, archive, routes, export, refinery, debug, bi, solicitantes, maintenance
 except (ImportError, ValueError):
-    from routers import auth, data, admin, stock, upload, archive, routes, export, refinery, debug, bi, solicitantes
+    from routers import auth, data, admin, stock, upload, archive, routes, export, refinery, debug, bi, solicitantes, maintenance
 
 app = FastAPI(
     title="Supply Systems 2026 - Absolute Perfection",
@@ -57,3 +57,4 @@ app.include_router(refinery.router)
 app.include_router(debug.router)
 app.include_router(bi.router)
 app.include_router(solicitantes.router)
+app.include_router(maintenance.router)

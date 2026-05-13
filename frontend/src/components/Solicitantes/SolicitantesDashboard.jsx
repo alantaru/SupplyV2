@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthProvider';
 import { useToast } from '../../context/ToastContext';
 import api from '../../lib/api';
@@ -41,6 +41,13 @@ function SourceBadge({ source }) {
         </span>
     );
 }
+
+const SortIcon = ({ col, sortCol, sortDir }) => {
+    if (sortCol !== col) return <div className="flex flex-col opacity-20"><ArrowUp className="w-2 h-2" /><ArrowDown className="w-2 h-2" /></div>;
+    return sortDir === 'asc'
+        ? <ArrowUp className="w-3 h-3 text-primary" />
+        : <ArrowDown className="w-3 h-3 text-primary" />;
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function SolicitantesDashboard() {
@@ -85,7 +92,7 @@ export default function SolicitantesDashboard() {
         if (!contractId) return;
         setLoading(true);
         try {
-            const res = await api.get('/data/solicitantes', { params: { contract_id: contractId } });
+            const res = await api.get('data/solicitantes', { params: { contract_id: contractId } });
             setContacts(Array.isArray(res.data) ? res.data : []);
         } catch {
             addToast('Erro ao carregar solicitantes.', 'error');
@@ -132,16 +139,9 @@ export default function SolicitantesDashboard() {
         else { setSortCol(col); setSortDir('asc'); }
     };
 
-    const SortIcon = ({ col }) => {
-        if (sortCol !== col) return <div className="flex flex-col opacity-20"><ArrowUp className="w-2 h-2" /><ArrowDown className="w-2 h-2" /></div>;
-        return sortDir === 'asc'
-            ? <ArrowUp className="w-3 h-3 text-primary" />
-            : <ArrowDown className="w-3 h-3 text-primary" />;
-    };
-
     // ─── CRUD handlers ───────────────────────────────────────────────────────
     const handleCreate = async ({ nome, ramal, area, obs }) => {
-        await api.post('/data/solicitantes', { nome, ramal, obs }, { params: { contract_id: contractId } });
+        await api.post('data/solicitantes', { nome, ramal, obs }, { params: { contract_id: contractId } });
         addToast('Solicitante criado.', 'success');
         load();
     };
@@ -173,8 +173,8 @@ export default function SolicitantesDashboard() {
             addToast('Solicitante excluído.', 'success');
             setDeleteTarget(null);
             load();
-        } catch (e) {
-            addToast(e.response?.data?.detail || 'Erro ao excluir.', 'error');
+        } catch (_e) {
+            addToast(_e.response?.data?.detail || 'Erro ao excluir.', 'error');
         } finally {
             setDeleting(false);
         }
@@ -193,11 +193,11 @@ export default function SolicitantesDashboard() {
     const handleImport = async () => {
         setImporting(true);
         try {
-            const res = await api.post('/data/solicitantes/import-from-mapa', {}, { params: { contract_id: contractId } });
+            const res = await api.post('data/solicitantes/import-from-mapa', {}, { params: { contract_id: contractId } });
             setImportResult(res.data);
             load();
-        } catch (e) {
-            addToast(e.response?.data?.detail || 'Erro na importação.', 'error');
+        } catch (_e) {
+            addToast(_e.response?.data?.detail || 'Erro na importação.', 'error');
         } finally {
             setImporting(false);
         }
@@ -318,7 +318,7 @@ export default function SolicitantesDashboard() {
                                     >
                                         <div className="flex items-center gap-1.5">
                                             {col.label}
-                                            {col.key !== 'EquipamentosLista' && <SortIcon col={col.key} />}
+                                            {col.key !== 'EquipamentosLista' && <SortIcon col={col.key} sortCol={sortCol} sortDir={sortDir} />}
                                         </div>
                                     </ResizableHeader>
                                 ))}

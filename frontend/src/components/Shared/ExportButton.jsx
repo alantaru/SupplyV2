@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Download, ChevronDown, Check } from 'lucide-react';
 import { downloadFileFromAPI } from '../../lib/utils';
 

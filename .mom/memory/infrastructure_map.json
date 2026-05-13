@@ -1,0 +1,20 @@
+{
+  "storage_abstraction": {
+    "interface": "StorageBackend (Protocol)",
+    "implementations": {
+      "S3Storage": "Used in Production/Staging via boto3/fsspec",
+      "LocalStorage": "Used in Local Dev (DATA_DIR)"
+    }
+  },
+  "folder_structure": {
+    "{contract_id}/": {
+      "Mapa.csv": "Master equipment list",
+      "Estoque.csv": "Inventory levels",
+      "Entregas.csv": "Protocol/Delivery history",
+      "config.json": "Contract-specific settings (mappings, metadata)",
+      "backups/": "Automated CSV snapshots before writes"
+    },
+    "refinery/": "Cortex knowledge DB",
+    "temp/": "Transient ingestion files"
+  }
+}

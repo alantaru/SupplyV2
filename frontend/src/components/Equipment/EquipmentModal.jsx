@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { X, Printer, MapPin, Activity, Calendar, FileText, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Printer, MapPin, Activity, Calendar, FileText, Search, Pencil, Check, RotateCcw } from 'lucide-react';
 import api from '../../lib/api';
 import { cn } from '../../lib/utils';
 
@@ -12,12 +12,12 @@ export default function EquipmentModal({ serie, onClose, activeContract }) {
     // History Pagination/Filter
     const [historySearch, setHistorySearch] = useState('');
     const [historyPage, setHistoryPage] = useState(1);
-    const historyItemsPerPage = 5;
+    const [historyItemsPerPage] = useState(5);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState({});
+    const [saving, setSaving] = useState(false);
 
-    // Helper for contract ID extraction
-    const contractId = typeof activeContract === 'string'
-        ? activeContract
-        : activeContract?.contract_id || activeContract?.id || null;
+    const contractId = activeContract;
 
     useEffect(() => {
         if (!serie) return;
@@ -29,10 +29,11 @@ export default function EquipmentModal({ serie, onClose, activeContract }) {
                 });
                 if (res.data) {
                     setData(res.data);
+                    setEditData(res.data.equipment || {});
                 } else {
                     setError('Equipamento não encontrado.');
                 }
-            } catch (err) {
+            } catch (_err) {
 
 
                 setError('Erro ao carregar detalhes.');
@@ -42,6 +43,28 @@ export default function EquipmentModal({ serie, onClose, activeContract }) {
         };
         fetchDetails();
     }, [serie, contractId]);
+
+    const handleSaveEdit = async () => {
+        setSaving(true);
+        try {
+            await api.post('/maintenance/manual-edit', {
+                serie: serie,
+                changes: editData
+            }, { params: { contract_id: contractId } });
+            
+            // Reload data
+            const res = await api.get(`/data/assist/equipment/${encodeURIComponent(serie)}`, {
+                params: { contract_id: contractId }
+            });
+            setData(res.data);
+            setIsEditing(false);
+        } catch (err) {
+            console.error('Error saving edit:', err);
+            alert('Erro ao salvar alterações.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     if (!serie) return null;
 
@@ -64,12 +87,42 @@ export default function EquipmentModal({ serie, onClose, activeContract }) {
                                     </span>
                                 )}
                             </h2>
-                            <button
-                                onClick={onClose}
-                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {!isEditing ? (
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-400 dark:text-slate-500 hover:text-primary"
+                                        title="Editar Inventário"
+                                    >
+                                        <Pencil className="h-5 w-5" />
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={handleSaveEdit}
+                                            disabled={saving}
+                                            className="p-2 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-200 transition-all disabled:opacity-50"
+                                            title="Salvar"
+                                        >
+                                            {saving ? <RotateCcw className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsEditing(false); setEditData(data.equipment); }}
+                                            disabled={saving}
+                                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-400 dark:text-slate-500"
+                                            title="Cancelar"
+                                        >
+                                            <X className="h-5 w-5" />
+                                        </button>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                                >
+                                    <X className="h-6 w-6" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Tabs */}
@@ -120,7 +173,15 @@ export default function EquipmentModal({ serie, onClose, activeContract }) {
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[9px] uppercase text-slate-400 dark:text-slate-500 font-bold tracking-widest">Fila / Hostname</label>
-                                            <p className="text-sm font-mono text-primary font-bold">{data.equipment.Fila || '-'}</p>
+                                            {isEditing ? (
+                                               <input 
+                                                   className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-3 py-1 text-xs font-mono text-primary font-bold outline-none focus:ring-1 focus:ring-primary w-full"
+                                                   value={editData.Fila || ''}
+                                                   onChange={(e) => setEditData({...editData, Fila: e.target.value})}
+                                               />
+                                            ) : (
+                                               <p className="text-sm font-mono text-primary font-bold">{data.equipment.Fila || '-'}</p>
+                                            )}
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[9px] uppercase text-slate-400 dark:text-slate-500 font-bold tracking-widest">Status</label>
@@ -148,21 +209,60 @@ export default function EquipmentModal({ serie, onClose, activeContract }) {
                                             Localização
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                                            <div className="flex justify-between py-3 border-b border-slate-100 dark:border-slate-800">
+                                            <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
                                                 <span className="text-slate-400 dark:text-slate-500 font-medium">Unidade</span>
-                                                <span className="font-bold text-slate-800 dark:text-white text-right">{data.equipment.Empresa || '-'}</span>
+                                                {isEditing ? (
+                                                    <input 
+                                                       className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-bold text-right outline-none focus:ring-1 focus:ring-primary w-48"
+                                                       value={editData.Empresa || ''}
+                                                       onChange={(e) => setEditData({...editData, Empresa: e.target.value})}
+                                                    />
+                                                ) : (
+                                                    <span className="font-bold text-slate-800 dark:text-white text-right">{data.equipment.Empresa || '-'}</span>
+                                                )}
                                             </div>
-                                            <div className="flex justify-between py-3 border-b border-slate-100 dark:border-slate-800">
+                                            <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
                                                 <span className="text-slate-400 dark:text-slate-500 font-medium">Cidade / UF</span>
-                                                <span className="font-bold text-slate-800 dark:text-white text-right">{data.equipment.Cidade} - {data.equipment.UF}</span>
+                                                {isEditing ? (
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                           className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-bold text-right outline-none focus:ring-1 focus:ring-primary w-32"
+                                                           value={editData.Cidade || ''}
+                                                           onChange={(e) => setEditData({...editData, Cidade: e.target.value})}
+                                                        />
+                                                        <input 
+                                                           className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-bold text-right outline-none focus:ring-1 focus:ring-primary w-12"
+                                                           value={editData.UF || ''}
+                                                           onChange={(e) => setEditData({...editData, UF: e.target.value})}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="font-bold text-slate-800 dark:text-white text-right">{data.equipment.Cidade} - {data.equipment.UF}</span>
+                                                )}
                                             </div>
-                                            <div className="flex justify-between py-3 border-b border-slate-100 dark:border-slate-800">
+                                            <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
                                                 <span className="text-slate-400 dark:text-slate-500 font-medium">Setor</span>
-                                                <span className="font-bold text-slate-800 dark:text-white text-right">{data.equipment.Area || '-'}</span>
+                                                {isEditing ? (
+                                                    <input 
+                                                       className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-bold text-right outline-none focus:ring-1 focus:ring-primary w-48"
+                                                       value={editData.Area || ''}
+                                                       onChange={(e) => setEditData({...editData, Area: e.target.value})}
+                                                    />
+                                                ) : (
+                                                    <span className="font-bold text-slate-800 dark:text-white text-right">{data.equipment.Area || '-'}</span>
+                                                )}
                                             </div>
-                                            <div className="flex justify-between py-3 border-b border-slate-100 dark:border-slate-800">
+                                            <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
                                                 <span className="text-slate-400 dark:text-slate-500 font-medium">Local de Instalação</span>
-                                                <span className="font-bold text-slate-800 dark:text-white text-right">{data.equipment.LocalInstalacao || '-'}</span>
+                                                {isEditing ? (
+                                                    <input 
+                                                       className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-bold text-right outline-none focus:ring-1 focus:ring-primary w-48"
+                                                       value={editData.LocalInstalacao || ''}
+                                                       onChange={(e) => setEditData({...editData, LocalInstalacao: e.target.value})}
+                                                    />
+                                                ) : (
+                                                    <span className="font-bold text-slate-800 dark:text-white text-right">{data.equipment.LocalInstalacao || '-'}</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

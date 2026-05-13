@@ -15,7 +15,7 @@ class StockService:
         Get current stock levels for the active contract.
         Retrocompatível: itens sem Categoria são tratados como 'customizado'.
         """
-        df = database.load_estoque(self.contract_id)
+        df = database.load_normalized("ESTOQUE", self.contract_id)
         if df.empty:
             return []
 
@@ -26,12 +26,7 @@ class StockService:
             else:
                 df[col] = df[col].fillna(default).astype(str).replace("nan", default)
 
-        # Use Adapter
-        try:
-            from .. import adapters
-        except (ImportError, ValueError):
-            from core import adapters
-        return adapters.normalize_dataframe(df)
+        return df.to_dict(orient='records')
 
     def get_history(self, limit: int = 100) -> List[Dict[str, Any]]:
         """
@@ -66,8 +61,8 @@ class StockService:
             return {"status": "error", "message": "Quantity is 0"}
 
         with database.DB_LOCK:
-            df_estoque = database.load_estoque(self.contract_id)
-            df_history = database.load_estoque_lancamentos(self.contract_id)
+            df_estoque = database.load_normalized("ESTOQUE", self.contract_id)
+            df_history = database.load_normalized("ESTOQUE_LANCAMENTOS", self.contract_id)
             
             # Update Stock
             mask = df_estoque['TipoModelo'].astype(str).str.strip().str.lower() == str(item).strip().lower()
@@ -134,7 +129,7 @@ class StockService:
             return {"status": "error", "message": "Missing original item name"}
 
         with database.DB_LOCK:
-            df_estoque = database.load_estoque(self.contract_id)
+            df_estoque = database.load_normalized("ESTOQUE", self.contract_id)
 
             # Garantir colunas novas existem
             for col, default in [("Categoria", "customizado"), ("ModeloEquipamento", ""), ("TipoToner", ""), ("Codigo", "")]:
@@ -180,7 +175,7 @@ class StockService:
             return {"status": "error", "message": "Item name required"}
             
         with database.DB_LOCK:
-            df_estoque = database.load_estoque(self.contract_id)
+            df_estoque = database.load_normalized("ESTOQUE", self.contract_id)
             
             # Case-insensitive match
             mask = df_estoque['TipoModelo'].astype(str).str.strip().str.lower() == str(item_name).strip().lower()
@@ -235,8 +230,8 @@ class StockService:
         codigo = str(data.get("codigo", "")).strip()
 
         with database.DB_LOCK:
-            df_estoque = database.load_estoque(self.contract_id)
-            df_history = database.load_estoque_lancamentos(self.contract_id)
+            df_estoque = database.load_normalized("ESTOQUE", self.contract_id)
+            df_history = database.load_normalized("ESTOQUE_LANCAMENTOS", self.contract_id)
 
             # Verificar duplicata (case-insensitive)
             if not df_estoque.empty and "TipoModelo" in df_estoque.columns:
@@ -285,19 +280,15 @@ class StockService:
         Retorna lista de modelos únicos do MAPA.csv para popular dropdown de toners.
         """
         try:
-            df = database.load_mapa(self.contract_id)
+            df = database.load_normalized("MAPA", self.contract_id)
         except Exception:
             return []
 
         if df is None or df.empty:
             return []
 
-        # Encontrar coluna de modelo (case-insensitive)
-        col = None
-        for c in df.columns:
-            if c.strip().upper() in ("MODELOSIMPRESS", "MODELO"):
-                col = c
-                break
+        # Encontrar coluna de modelo (Canonical TitleCase from Adapter)
+        col = "ModeloSimpress" if "ModeloSimpress" in df.columns else ("Modelo" if "Modelo" in df.columns else None)
 
         if not col:
             return []

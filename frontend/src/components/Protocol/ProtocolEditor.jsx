@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
@@ -17,9 +17,9 @@ export default function ProtocolEditor() {
     const [showPreview, setShowPreview] = useState(false);
     const printRef = useRef();
 
-    useEffect(() => { loadProtocol(); }, [id]);
+    useEffect(() => { loadProtocol(); }, [id, loadProtocol]);
 
-    const loadProtocol = async () => {
+    const loadProtocol = useCallback(async () => {
         try {
             setLoading(true);
             const res = await api.get(`/data/entregas/${id}`);
@@ -29,7 +29,7 @@ export default function ProtocolEditor() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id, addToast]);
 
     const handlePrint = useReactToPrint({
         contentRef: printRef,

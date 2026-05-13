@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Key, Lock, User, ArrowLeft } from 'lucide-react';
 import api from '../../lib/api';
@@ -25,7 +25,7 @@ export default function ForgotPassword() {
             });
             setStatus({ type: 'success', msg: 'Senha redefinida com sucesso!' });
             setTimeout(() => navigate('/login'), 2000);
-        } catch (error) {
+        } catch (_error) {
 
 
             const msg = error.response?.data?.detail || "Erro ao redefinir senha";

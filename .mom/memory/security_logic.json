@@ -1,0 +1,24 @@
+{
+  "authentication": {
+    "type": "JWT (Stateless)",
+    "hashing": "PBKDF2 with SHA256 (via passlib)",
+    "token_expiration": "1440 minutes (24h)",
+    "endpoints": ["/auth/token", "/auth/me", "/auth/recover-password"]
+  },
+  "authorization": {
+    "roles": {
+      "superadmin": "Full system access, cross-contract management",
+      "admin": "Contract-level administration, local user management",
+      "insumos": "Supplies operations (Deliveries, Stock, Routes)",
+      "manutencao": "Technical operations (OS, Maintenance Dashboard, Equipment)"
+    }
+  },
+  "data_isolation": {
+    "tenancy": "Logical isolation by S3 Prefix ({contract_id}/...)",
+    "enforcement": "get_authorized_session dependency enforces contract_id context; Service layer consumes context"
+  },
+  "hardening": {
+    "counter_proof": "Mandatory image upload for OS creation",
+    "map_lock": "Technical edits override official Mapa until manual reconciliation"
+  }
+}

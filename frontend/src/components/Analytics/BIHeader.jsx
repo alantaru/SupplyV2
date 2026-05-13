@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, Calendar } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 const PRESETS = [
   { label: 'Últimos 30 dias', days: 30 },

@@ -36,22 +36,20 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 async def get_current_user_data(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
     """Returns the full user dictionary (username, role, etc)"""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+            print(f"DEBUG 401: username is None in payload. Token: {token[:20]}...")
+            raise HTTPException(status_code=401, detail="Debug 401: username is None in payload")
+    except JWTError as e:
+        print(f"DEBUG 401: JWTError: {e}. Token: {token[:20]}...")
+        raise HTTPException(status_code=401, detail=f"Debug 401: JWTError: {e}")
         
     user = users.get_user(username)
     if not user:
-        raise credentials_exception
+        print(f"DEBUG 401: users.get_user({username}) returned None")
+        raise HTTPException(status_code=401, detail=f"Debug 401: users.get_user({username}) returned None")
     
     # Inject username into dict for convenience
     user_data = user.copy()

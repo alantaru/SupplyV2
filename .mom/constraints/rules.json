@@ -1,0 +1,11 @@
+{
+  "constraints": [
+    "100% Backend Coverage (Non-negotiable)",
+    "0% Linting Errors (Ruff)",
+    "0% Warnings/Skipping in tests",
+    "No hardcoded columns (use mappings)",
+    "Deploy frontend after every change",
+    "Commit to main after every task",
+    "Placeholder for AWS secrets in commits"
+  ]
+}

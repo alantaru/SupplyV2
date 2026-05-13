@@ -1,21 +1,24 @@
-import React, { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Package, Truck, Settings, Menu } from 'lucide-react';
+import { useState } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, PlusCircle, Package, Truck, Settings, Menu, Hammer } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UserProfileModal from './Settings/UserProfileModal';
+import NotificationBell from './Shared/NotificationBell';
 import { useAuth } from '../context/AuthProvider';
 
 export default function Layout() {
     const location = useLocation();
+    const navigate = useNavigate();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const { user } = useAuth();
 
     const navItems = [
-        { name: 'Pendências', icon: LayoutDashboard, path: '/' },
-        { name: 'Novo Protocolo', icon: PlusCircle, path: '/wizard' },
-        { name: 'Entregas', icon: Truck, path: '/deliveries' }, 
-        { name: 'Estoque', icon: Package, path: '/inventory' },
-    ];
+        { name: 'Pendências', icon: LayoutDashboard, path: '/', roles: ['admin', 'insumos'] },
+        { name: 'Novo Protocolo', icon: PlusCircle, path: '/wizard', roles: ['admin', 'insumos'] },
+        { name: 'Entregas', icon: Truck, path: '/deliveries', roles: ['admin', 'insumos'] }, 
+        { name: 'Estoque', icon: Package, path: '/inventory', roles: ['admin', 'insumos'] },
+        { name: 'Manutenção', icon: Hammer, path: '/maintenance', roles: ['admin', 'manutencao'] },
+    ].filter(item => !item.roles || item.roles.includes(user?.role));
 
     const currentTitle = navItems.find(item => item.path === location.pathname)?.name || 'Supply 2026';
     const activeContractId = user?.activeContract?.contract_id || user?.activeContract || '00000000';
@@ -64,7 +67,7 @@ export default function Layout() {
 
                 <div className="p-8 border-t border-white/5">
                     <button 
-                        onClick={() => window.location.href = '/settings'}
+                        onClick={() => navigate('/settings')}
                         className="flex items-center gap-4 px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-[#D18BFF] bg-[#D18BFF]/5 border border-[#D18BFF]/20 w-full rounded-xl hover:bg-[#D18BFF] hover:text-black transition-all group"
                     >
                         <Settings className="h-4 w-4 group-hover:rotate-90 transition-transform duration-500" />
@@ -94,6 +97,7 @@ export default function Layout() {
                     </div>
 
                     <div className="flex items-center gap-8">
+                        <NotificationBell />
                         {/* Monitoramento de Status */}
                         <div className="hidden lg:flex items-center gap-6 pr-6 border-r border-white/5">
                             <div className="flex flex-col items-end">

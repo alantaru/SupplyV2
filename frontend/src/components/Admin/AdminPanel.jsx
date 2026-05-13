@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { Users, FileText, Plus, Trash2, Shield, Key, FolderPlus, X, Edit, Settings, Check, Sliders, Image, Globe, RefreshCw, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -18,11 +18,11 @@ const ADMIN_USERS_COLUMNS = [
     { key: 'username',      label: 'Usuário',      w: undefined },
     { key: 'role',          label: 'Perfil',        w: '120px' },
     { key: 'initial_route', label: 'Tela Inicial',  w: '130px' },
+    { key: 'admin_ids',     label: 'Admins',        w: '160px' },
     { key: 'contracts',     label: 'Contratos',     w: undefined },
 ];
 
 export default function AdminPanel() {
-    const { addToast } = useToast();
     const { user } = useAuth();
     const isSuperadmin = user?.role === 'superadmin';
     const [activeTab, setActiveTab] = useState('users');
@@ -87,28 +87,45 @@ export default function AdminPanel() {
 
 function UsersTab() {
     const { addToast } = useToast();
+    const { user: currentUser } = useAuth();
+    const isSuperadmin = currentUser?.role === 'superadmin';
     const [users, setUsers] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [deleteModal, setDeleteModal] = useState(null);
     const [contracts, setContracts] = useState([]);
+    const [adminUsers, setAdminUsers] = useState([]);
+    const [assignAdminModal, setAssignAdminModal] = useState(null); // {username, admin_ids}
 
     const { currentData: currentUsers, paginationProps } = usePagination(users, 10);
     const { columns, setColumns, visibleColumns } = useColumns('admin-users-columns', ADMIN_USERS_COLUMNS);
     const { widths, setColumnWidth } = useColumnWidths('admin-users-columns');
 
-    useEffect(() => { loadData(); }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             const [uRes, cRes] = await Promise.all([
                 api.get('admin/users'),
                 api.get('admin/contracts')
             ]);
-            setUsers(Array.isArray(uRes.data) ? uRes.data : []);
+            const allUsers = Array.isArray(uRes.data) ? uRes.data : [];
+            setUsers(allUsers);
             setContracts(Array.isArray(cRes.data) ? cRes.data : []);
-        } catch (e) { setUsers([]); setContracts([]); }
+            setAdminUsers(allUsers.filter(u => u.role === 'admin' || u.role === 'superadmin'));
+        } catch (_e) { setUsers([]); setContracts([]); setAdminUsers([]); }
+    }, []);
+
+    useEffect(() => { loadData(); }, [loadData]);
+
+    const handleAssignUserAdmins = async (username, newAdminIds) => {
+        try {
+            await api.put(`/admin/users/${username}/assign-admins`, { admin_ids: newAdminIds });
+            addToast(`Admins do usuário ${username} atualizados.`, 'success');
+            setAssignAdminModal(null);
+            loadData();
+        } catch (_e) {
+            addToast(e.response?.data?.detail || 'Erro ao atribuir admins.', 'error');
+        }
     };
 
     const handleDelete = (username) => {
@@ -128,7 +145,7 @@ function UsersTab() {
             await api.delete(`/admin/users/${username}`);
             setDeleteModal(null);
             loadData();
-        } catch (e) { addToast(e.response?.data?.detail || "Erro ao excluir", "error"); }
+        } catch (_e) { addToast(_e.response?.data?.detail || "Erro ao excluir", "error"); }
     };
 
     const openEdit = (user) => { setSelectedUser(user); setIsEditMode(true); setShowModal(true); };
@@ -200,6 +217,19 @@ function UsersTab() {
                                             );
                                         case 'initial_route':
                                             return <td key={col.key} className="px-5 py-4 text-slate-600 dark:text-slate-400 font-mono text-[10px] font-bold">{u.initial_route || "/"}</td>;
+                                        case 'admin_ids':
+                                            return (
+                                                <td key={col.key} className="px-5 py-4">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {(u.admin_ids || []).map(aid => (
+                                                            <span key={aid} className="text-[9px] bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                                                                <Shield size={8} /> {aid}
+                                                            </span>
+                                                        ))}
+                                                        {!(u.admin_ids?.length) && <span className="text-[9px] text-slate-400 italic">—</span>}
+                                                    </div>
+                                                </td>
+                                            );
                                         case 'contracts':
                                             return (
                                                 <td key={col.key} className="px-5 py-4">
@@ -219,6 +249,15 @@ function UsersTab() {
                                 <td className="px-5 py-4 text-right">
                                     <div className="flex items-center justify-end gap-2">
                                         <button onClick={() => openEdit(u)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"><Edit size={14} /></button>
+                                        {isSuperadmin && (
+                                            <button
+                                                onClick={() => setAssignAdminModal({ username: u.username, admin_ids: u.admin_ids || [] })}
+                                                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-all"
+                                                title="Gerenciar admins responsáveis"
+                                            >
+                                                <Shield size={14} />
+                                            </button>
+                                        )}
                                         <button onClick={() => handleDelete(u.username)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-lg transition-all"><Trash2 size={14} /></button>
                                     </div>
                                 </td>
@@ -254,6 +293,61 @@ function UsersTab() {
                     onSuccess={loadData}
                 />
             )}
+
+            {/* Superadmin: assign admins to user modal */}
+            {assignAdminModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center border border-amber-200 dark:border-amber-800">
+                                    <Shield size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 dark:text-white text-sm">Admins responsáveis</h3>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Usuário: <strong>{assignAdminModal.username}</strong></p>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
+                                {adminUsers.map(au => {
+                                    const isSelected = assignAdminModal.admin_ids.includes(au.username);
+                                    return (
+                                        <label key={au.username} className={cn(
+                                            "flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-all",
+                                            isSelected ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-200'
+                                        )}>
+                                            <div className={cn("w-4 h-4 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all",
+                                                isSelected ? 'border-amber-500 bg-amber-500' : 'border-slate-300 dark:border-slate-600'
+                                            )}>
+                                                {isSelected && <Check size={10} className="text-white" strokeWidth={4} />}
+                                            </div>
+                                            <input type="checkbox" className="hidden" checked={isSelected} onChange={() => {
+                                                const ids = assignAdminModal.admin_ids;
+                                                setAssignAdminModal(prev => ({
+                                                    ...prev,
+                                                    admin_ids: isSelected ? ids.filter(x => x !== au.username) : [...ids, au.username]
+                                                }));
+                                            }} />
+                                            <Shield size={12} className="text-amber-500 opacity-70" />
+                                            <span className="text-sm font-bold text-slate-800 dark:text-white">{au.username}</span>
+                                            <span className="ml-auto text-[9px] text-slate-400 uppercase">{au.role}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700 p-4 flex gap-3">
+                            <button onClick={() => setAssignAdminModal(null)} className="flex-1 py-2.5 text-xs font-bold text-slate-400 uppercase tracking-widest hover:bg-white dark:hover:bg-slate-800 rounded-xl transition-all">Cancelar</button>
+                            <button
+                                onClick={() => handleAssignUserAdmins(assignAdminModal.username, assignAdminModal.admin_ids)}
+                                className="flex-[2] py-2.5 text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg bg-amber-500 text-white hover:bg-amber-600 active:scale-95"
+                            >
+                                Salvar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -283,7 +377,7 @@ function UserModal({ user, isEdit, contracts, isSuperadmin, onClose, onSuccess }
                 const res = await api.post('admin/users', form);
                 setRecoveryInfo(res.data);
             }
-        } catch (e) { addToast(e.response?.data?.detail || "Erro ao salvar", "error"); }
+        } catch (_e) { addToast(_e.response?.data?.detail || "Erro ao salvar", "error"); }
     };
 
     const handleContractChange = (contractId) => {
@@ -401,7 +495,7 @@ function UserModal({ user, isEdit, contracts, isSuperadmin, onClose, onSuccess }
                         <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 max-h-40 overflow-y-auto space-y-1.5 custom-scrollbar transition-colors">
                             {contracts.length === 0 && <span className="text-[10px] text-slate-400 dark:text-slate-500 italic p-3 block text-center">Nenhum contrato disponível</span>}
                             {contracts
-                                .filter(c => c.status === 'active' || (user?.contracts || []).includes(c.id || c))
+                                .filter(c => c.status === 'active')
                                 .map(c => {
                                     const contractId = c.id || c;
                                     const contractName = c.name || '';
@@ -435,11 +529,70 @@ function UserModal({ user, isEdit, contracts, isSuperadmin, onClose, onSuccess }
     );
 }
 
+function AdminAssignSelector({ _contractId, currentAdminIds, adminUsers, onSave }) {
+    const [open, setOpen] = useState(false);
+    const [selected, setSelected] = useState(currentAdminIds);
+
+    const toggle = (username) => {
+        setSelected(prev =>
+            prev.includes(username) ? prev.filter(x => x !== username) : [...prev, username]
+        );
+    };
+
+    const handleSave = () => {
+        onSave(selected);
+        setOpen(false);
+    };
+
+    return (
+        <div className="mt-1">
+            {!open ? (
+                <button
+                    onClick={() => { setSelected(currentAdminIds); setOpen(true); }}
+                    className="text-[9px] font-bold text-primary/70 hover:text-primary uppercase tracking-widest flex items-center gap-1 transition-colors"
+                >
+                    <Edit size={9} /> Gerenciar admins
+                </button>
+            ) : (
+                <div className="mt-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-2 animate-in slide-in-from-top-1 duration-200">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Selecione os admins responsáveis:</p>
+                    <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                        {adminUsers.map(u => (
+                            <label key={u.username} className={cn(
+                                "flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer transition-all text-[10px] font-bold",
+                                selected.includes(u.username)
+                                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                                    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200'
+                            )}>
+                                <div className={cn("w-3.5 h-3.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all",
+                                    selected.includes(u.username) ? 'border-amber-500 bg-amber-500' : 'border-slate-300 dark:border-slate-600'
+                                )}>
+                                    {selected.includes(u.username) && <Check size={9} className="text-white" strokeWidth={4} />}
+                                </div>
+                                <input type="checkbox" className="hidden" checked={selected.includes(u.username)} onChange={() => toggle(u.username)} />
+                                <Shield size={9} className="opacity-60" />
+                                {u.username}
+                                <span className="ml-auto opacity-50 font-normal">{u.role}</span>
+                            </label>
+                        ))}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                        <button onClick={handleSave} className="flex-1 bg-primary text-white text-[9px] font-bold uppercase py-1.5 rounded-lg hover:bg-primary/90 transition-all">Salvar</button>
+                        <button onClick={() => setOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[9px] font-bold uppercase py-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Cancelar</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function ContractsTab() {
     const { addToast } = useToast();
-    const { updateActiveContract } = useAuth();
+    const { user: currentUser } = useAuth();
+    const isSuperadmin = currentUser?.role === 'superadmin';
     const [contracts, setContracts] = useState([]);
     const [users, setUsers] = useState([]);
+    const [adminUsers, setAdminUsers] = useState([]); // admins for assignment
     const [showForm, setShowForm] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [form, setForm] = useState({ id: '', name: '', description: '', status: 'active' });
@@ -447,15 +600,18 @@ function ContractsTab() {
     const [deleteModal, setDeleteModal] = useState(null);
     const navigate = useNavigate();
 
-    useEffect(() => { load(); }, []);
-
-    const load = async () => {
+    const load = useCallback(async () => {
         try {
             const [cRes, uRes] = await Promise.all([api.get('admin/contracts'), api.get('admin/users')]);
+            const allUsers = Array.isArray(uRes.data) ? uRes.data : [];
             setContracts(Array.isArray(cRes.data) ? cRes.data : []);
-            setUsers(Array.isArray(uRes.data) ? uRes.data : []);
-        } catch (e) { setContracts([]); setUsers([]); }
-    };
+            setUsers(allUsers);
+            // Admins available for contract assignment (superadmin sees all admins)
+            setAdminUsers(allUsers.filter(u => u.role === 'admin' || u.role === 'superadmin'));
+        } catch (_e) { setContracts([]); setUsers([]); setAdminUsers([]); }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
 
     const handleCreateOrUpdate = async (e) => {
         e.preventDefault();
@@ -478,7 +634,7 @@ function ContractsTab() {
             setShowForm(false);
             setIsEditMode(false);
             load();
-        } catch (e) { addToast(e.response?.data?.detail || "Erro", "error"); }
+        } catch (_e) { addToast(_e.response?.data?.detail || "Erro", "error"); }
         finally { setCreating(false); }
     };
 
@@ -499,11 +655,21 @@ function ContractsTab() {
             await api.delete(`/admin/contracts/${cid}`);
             setDeleteModal(null);
             load();
-        } catch (e) { addToast(e.response?.data?.detail || "Erro ao excluir.", "error"); }
+        } catch (_e) { addToast(_e.response?.data?.detail || "Erro ao excluir.", "error"); }
     };
 
     const openEdit = (c) => { setForm({ id: c.id, name: c.name || '', description: c.description || '', status: c.status || 'active' }); setIsEditMode(true); setShowForm(true); };
     const openCreate = () => { setForm({ id: '', name: '', description: '', status: 'active' }); setIsEditMode(false); setShowForm(true); };
+
+    const handleAssignAdmin = async (contractId, newAdminIds) => {
+        try {
+            await api.put(`/admin/contracts/${contractId}/assign-admins`, { admin_ids: newAdminIds });
+            addToast(`Admins do contrato #${contractId} atualizados.`, 'success');
+            load();
+        } catch (_e) {
+            addToast(e.response?.data?.detail || 'Erro ao atribuir admins.', 'error');
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -583,6 +749,30 @@ function ContractsTab() {
 
                             {c.description && <p className="text-xs text-slate-400 mb-4 line-clamp-2 border-l-2 border-slate-200 pl-3 italic">{c.description}</p>}
 
+                            {/* Admin owners */}
+                            <div className="space-y-1.5 mb-3">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Admins responsáveis:</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(c.admin_ids || (c.admin_id ? [c.admin_id] : [])).map(aid => (
+                                        <span key={aid} className="text-[10px] bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                                            <Shield size={9} /> {aid}
+                                        </span>
+                                    ))}
+                                    {!(c.admin_ids?.length || c.admin_id) && (
+                                        <span className="text-[10px] text-slate-400 italic">Nenhum admin atribuído</span>
+                                    )}
+                                </div>
+                                {/* Superadmin: inline admin assignment */}
+                                {isSuperadmin && (
+                                    <AdminAssignSelector
+                                        contractId={c.id || c}
+                                        currentAdminIds={c.admin_ids || (c.admin_id ? [c.admin_id] : [])}
+                                        adminUsers={adminUsers}
+                                        onSave={(ids) => handleAssignAdmin(c.id || c, ids)}
+                                    />
+                                )}
+                            </div>
+
                             <div className="space-y-2">
                                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Usuários com acesso:</span>
                                 <div className="flex flex-wrap gap-1.5">
@@ -630,6 +820,7 @@ function ContractsTab() {
                     onConfirm={confirmDelete}
                     icon={deleteModal.icon}
                     variant={deleteModal.variant}
+                    requireTyping={false}
                     confirmLabel={deleteModal.confirmLabel}
                 />
             )}
@@ -775,19 +966,19 @@ function BasePurgePanel({ addToast }) {
     const [confirmTarget, setConfirmTarget] = useState(null); // { contractId, fileKey, label, contractName }
     const [selectedContract, setSelectedContract] = useState('all');
 
-    const loadBases = async () => {
+    const loadBases = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await api.get('/admin/superadmin/bases');
+            const res = await api.get('admin/superadmin/bases');
             setBases(res.data);
-        } catch (e) {
+        } catch (_e) {
             addToast('Erro ao carregar bases.', 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [addToast]);
 
-    useEffect(() => { loadBases(); }, []);
+    useEffect(() => { loadBases(); }, [loadBases]);
 
     const handlePurge = async () => {
         if (!confirmTarget) return;
@@ -798,7 +989,7 @@ function BasePurgePanel({ addToast }) {
             const res = await api.delete(`/admin/superadmin/purge-base?contract_id=${contractId}&file_key=${fileKey}`);
             addToast(res.data.message || `Base "${label}" apagada.`, 'success');
             loadBases();
-        } catch (e) {
+        } catch (_e) {
             addToast(e.response?.data?.detail || 'Erro ao apagar base.', 'error');
         } finally {
             setPurging(null);

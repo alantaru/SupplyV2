@@ -1,0 +1,14 @@
+{
+  "categories": {
+    "toner": "Matched via ModeloEquipamento + TipoToner (BK/CY/MG/YW)",
+    "papel": "Matched via name 'A4 (RESMAS)' or 'A3 (RESMAS)'",
+    "customizado": "Matched via exact name"
+  },
+  "smart_stock_logic": {
+    "trigger": "ProtocolService.deliver()",
+    "resolution": "Resolves item type from protocol fields -> decrements stock -> records lancamento",
+    "auto_creation": "If item doesn't exist, creates with negative stock to prevent blocking deliveries",
+    "thread_safety": "Uses database.DB_LOCK for all I/O"
+  },
+  "retrocompatibility": "Fills missing columns (Categoria, Codigo, etc.) with defaults on load"
+}

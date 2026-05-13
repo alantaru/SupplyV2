@@ -102,8 +102,8 @@ def _normalize_for_matching(text: str) -> str:
     except Exception:
         pass
 
-    # ── Step 4: Alphanumeric only ────────────────────────────────────────────
-    return ''.join(c for c in text if c.isalnum())
+    # ── Step 4: Alphanumeric and underscores only ───────────────────────────
+    return ''.join(c for c in text if c.isalnum() or c == '_')
 
 
 class RefineryIngestor:
@@ -132,14 +132,20 @@ class RefineryIngestor:
         "leitor", "cracha", "cor", "departamento", "usuario", "email",
         "telefone", "ramal", "celular", "planta", "gerencia", "cnpj",
         "horario", "almoxarifado", "contato", "inventario", "tamanho",
-        # Counters / CONTADORES
-        "contadores", "page", "count", "mono", "color", "total", "papel",
-        "toner", "counter", "leitura", "data", "bk", "cy", "mg", "yw",
-        # Paper / PAPEL
-        "resma", "media", "meta", "mensal",
+        "produto", "preco", "item", "descricao", "qtd", "quantidade",
+        "unitario", "total", "subtotal", "desconto", "frete", "origem",
+        "destino", "remetente", "destinatario", "cliente", "fornecedor",
+        "codigo", "id", "referencia", "ref", "partnumber", "ean", "sku",
+        "nome", "razao", "social", "fantasia", "email", "telefone",
+        "celular", "cpf", "cnpj", "ie", "rg", "data", "nascimento",
+        "vencimento", "emissao", "pagamento", "competencia",
+        # Equipment / MAPA
+        "serie", "serial", "sn", "modelo", "marca", "tipo", "equipamento",
+        "ip", "hostname", "host", "fila", "status",
         # Generic
         "name", "model", "brand", "address", "city", "state", "contract",
-        "company", "location", "floor", "building", "department",
+        "company", "location", "floor", "building", "department", "date",
+        "price", "value", "cost", "total", "quantity", "amount",
     }
 
     # Encoding detection order — cp1252 BEFORE latin1 to handle Windows files correctly
@@ -338,9 +344,21 @@ class RefineryIngestor:
         keyword_hits = 0
         for part in clean:
             # Normalize for matching (handles mojibake and accents)
+            # Normalize for matching (handles mojibake and accents)
             norm = _normalize_for_matching(part)
-            if any(kw in norm for kw in self.KNOWN_COLUMNS):
-                keyword_hits += 1
+            for kw in self.KNOWN_COLUMNS:
+                if len(kw) <= 2:
+                    # For short keywords (ip, sn, id), require exact match or underscore boundary
+                    if kw == norm or norm.startswith(kw) or norm.endswith(kw):
+                        # Still risky if it's just a prefix of a long word without boundary.
+                        # But in CSVs, 'IP_Address' or 'SN_Number' are common.
+                        # Let's try: exact or has underscore or is short.
+                        if kw == norm or "_" in norm or len(norm) <= 5:
+                            keyword_hits += 1
+                            break
+                elif kw in norm:
+                    keyword_hits += 1
+                    break
 
         width_score = len(parts)
         density = keyword_hits / len(clean) if clean else 0

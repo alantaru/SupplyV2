@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 
 export function usePagination(data = [], initialItemsPerPage = 10) {
     const [currentPage, setCurrentPage] = useState(1);

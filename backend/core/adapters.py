@@ -7,12 +7,18 @@ import pandas as pd
 FRONTEND_MAPPING = {
     # Identity
     'SERIE': 'Serie',
+    'SERIAL': 'Serie',
+    'NUMEROSERIE': 'Serie',
+    'SN': 'Serie',
     'FILA': 'Fila',
     'HOSTNAME': 'Fila',
+    'FILA_DE_IMPRESSAO': 'Fila',
     'MODELOSIMPRESS': 'ModeloSimpress',
     'MODELO': 'Modelo',
     'STATUS': 'Status',
+    'SITUACAO': 'Status',
     'IP': 'IP',
+    'ENDERECOIP': 'IP',
     
     # Location
     'EMPRESA': 'Empresa',
@@ -21,16 +27,20 @@ FRONTEND_MAPPING = {
     'AREA': 'Area',
     'SETOR': 'Area',
     'LOCALINSTALACAO': 'LocalInstalacao',
-    'ENDERECO': 'LocalInstalacao',          # legacy: ENDERECO maps to LocalInstalacao
-    'ENDERECOCOMPLETO': 'LocalInstalacao',  # legacy variant
     'LOCAL': 'LocalInstalacao',             # short form: "Local" column → LocalInstalacao
+    'LOCALDEINSTALACAO': 'LocalInstalacao',
     'LOCALINSTALATION': 'LocalInstalacao',  # typo variant
+    'ENDERECO': 'LocalInstalacao',          # Legacy mapping: Endereço field usually holds the installation room/local
+    'ENDERECOCOMPLETO': 'Endereco',         # variant
     'RUAREF': 'RuaRef',
     'RUA': 'RuaRef',                        # short form: "Rua" column → RuaRef
     'COMPLEMENTO': 'Complemento',
     'CONTATOSETOR': 'ContatoSetor',
     'CONTATO': 'ContatoSetor',
+    'DEPARTAMENTO': 'Area',
+    'SETOR_RESPONSAVEL': 'Area',
     'RAMAL': 'Ramal',
+    'TELEFONE': 'Ramal',
     'HORARIO': 'Horario',
     'HORÁRIO': 'Horario',
     
@@ -56,6 +66,12 @@ FRONTEND_MAPPING = {
     'COR': 'Cor',
     'CODIGO': 'Codigo',
     'ULTIMAALTERACAO': 'UltimaAlteracao',
+    'TOTAL': 'ContadorTotal',
+    'CONTADORTOTAL': 'ContadorTotal',
+    'ECCOUNTERTOTAL': 'ContadorTotal',
+    'EQA4COUNTERTOTAL': 'ContadorTotal',
+    'MEDIA': 'MediaSheets',
+    'A4RESMA': 'A4Resma',
     
     # Toner percentages (from Contadores.csv — various case/format variants)
     '%BK': 'toner_bk_pct',
@@ -96,14 +112,21 @@ FRONTEND_MAPPING = {
 def normalize_serie(value: Any) -> str:
     """
     Strictly normalize a Serial Number:
-    1. Convert to string
+    1. Convert to string (empty if null)
     2. Strip whitespace
     3. Upper case
     4. TRUNCATE to 14 characters (Simpress limitation)
     """
-    if pd.isna(value):
+    if value is None or pd.isna(value):
         return ""
-    return str(value).strip().upper()[:14]
+        
+    try:
+        from .. import config
+    except (ImportError, ValueError):
+        import config
+    
+    max_len = getattr(config, 'MAX_SERIAL_LENGTH', 14)
+    return str(value).strip().upper()[:max_len]
 
 def normalize_row(row: Dict[str, Any], keep_extra: bool = True) -> Dict[str, Any]:
     """
@@ -143,11 +166,12 @@ def normalize_row(row: Dict[str, Any], keep_extra: bool = True) -> Dict[str, Any
     if keep_extra:
         mapped_targets = set(FRONTEND_MAPPING.values())
         for k, v in row.items():
-            # If we haven't mapped this value to a known key yet, keep it.
-            # (Approximation: check if matches any target key)
             if k not in normalized and k not in mapped_targets:
                  normalized[k] = v
                  
+    # 3. Apply location fallbacks (e.g. Local <-> Rua)
+    normalized = _apply_location_fallbacks(normalized)
+    
     return {k: (v if pd.notna(v) else "") for k, v in normalized.items()}
 
 
@@ -203,13 +227,5 @@ def normalize_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
 
     records = df_norm.fillna("").to_dict(orient="records")
 
-    # 5. Apply location fallbacks: if LocalInstalacao empty, use RuaRef and vice-versa
-    for r in records:
-        local = str(r.get('LocalInstalacao', '')).strip()
-        rua = str(r.get('RuaRef', '')).strip()
-        if not local and rua:
-            r['LocalInstalacao'] = rua
-        elif not rua and local:
-            r['RuaRef'] = local
-
-    return records
+    # 5. Apply location fallbacks to each record
+    return [_apply_location_fallbacks(r) for r in records]

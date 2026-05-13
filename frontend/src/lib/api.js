@@ -28,11 +28,14 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && error.response.status === 401) {
-            // Optional: Clear token
-            localStorage.removeItem('token');
-            // Redirect to login if not already there
-            if (!window.location.pathname.includes('/login')) {
-                window.location.href = '/login';
+            const isLoginRequest = error.config.url.includes('auth/token');
+            
+            if (!isLoginRequest) {
+                console.warn(`[API] 401 Unauthorized on ${error.config.url}. Clearing session.`);
+                localStorage.removeItem('token');
+                if (!window.location.pathname.includes('/login')) {
+                    window.location.href = '/login';
+                }
             }
         }
         return Promise.reject(error);

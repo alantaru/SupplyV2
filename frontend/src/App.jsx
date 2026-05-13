@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Settings, Menu, ChevronLeft, LogOut, Shield, FileClock, Package, Map, Printer, Users } from 'lucide-react';
+import { LayoutDashboard, Settings, Menu, ChevronLeft, LogOut, Shield, FileClock, Package, Map, Printer, Users, Wrench } from 'lucide-react';
 import UserProfileModal from './components/Settings/UserProfileModal';
 import ContractSwitcher from './components/Shared/ContractSwitcher';
-// import NotificationBell from './components/Shared/NotificationBell'; // If needed, can be restored later
+import NotificationBell from './components/Shared/NotificationBell';
 
 import Dashboard from './components/Dashboard';
 import ProtocolWizard from './components/Wizard/ProtocolWizard';
@@ -19,6 +19,7 @@ import RouteDashboard from './components/Routes/RouteDashboard';
 import EquipmentDashboard from './components/Equipment/EquipmentDashboard';
 import SolicitantesDashboard from './components/Solicitantes/SolicitantesDashboard';
 import BIDashboard from './components/Analytics/BIDashboard';
+import MaintenanceDashboard from './components/Maintenance/MaintenanceDashboard';
 import ContractSetupWizard from './components/Wizard/ContractSetupWizard';
 import FullPageWizard from './components/Wizard/FullPageWizard';
 import { AuthProvider, useAuth } from './context/AuthProvider';
@@ -31,6 +32,7 @@ function AppContent() {
   const { user, logout, loading } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const avatar = localStorage.getItem(`user_avatar_${user?.username}`);
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -70,7 +72,6 @@ function AppContent() {
   }
 
   // 4. No-contract guard
-  const isAdmin = user.role === 'admin' || user.role === 'superadmin';
   const hasContract = user.activeContract && user.contracts?.length > 0;
 
   if (!hasContract) {
@@ -163,13 +164,18 @@ function AppContent() {
         <nav className="flex-1 overflow-y-auto py-6 custom-scrollbar">
           <ul className="space-y-1.5 px-3">
             {[
-              { to: "/", icon: LayoutDashboard, label: "Pendências" },
-              { to: "/history", icon: FileClock, label: "Histórico" },
-              { to: "/stock", icon: Package, label: "Estoque" },
-              { to: "/routes", icon: Map, label: "Rotas" },
-              { to: "/solicitantes", icon: Users, label: "Solicitantes" },
-              { to: "/equipment", icon: Printer, label: "Equipamentos" },
-            ].map((item) => (
+              { to: "/", icon: LayoutDashboard, label: "Pendências", role: "insumos" },
+              { to: "/history", icon: FileClock, label: "Histórico", role: "insumos" },
+              { to: "/stock", icon: Package, label: "Estoque", role: "insumos" },
+              { to: "/routes", icon: Map, label: "Rotas", role: "insumos" },
+              { to: "/maintenance", icon: Wrench, label: "Manutenção", role: "manutencao" },
+              { to: "/solicitantes", icon: Users, label: "Solicitantes", role: "manutencao" },
+              { to: "/equipment", icon: Printer, label: "Equipamentos", role: "manutencao" },
+            ].filter(item => {
+              if (user.role === 'admin' || user.role === 'superadmin') return true;
+              if (item.to === '/equipment') return user.role === 'manutencao' || user.role === 'insumos';
+              return item.role === user.role;
+            }).map((item) => (
               <li key={item.to}>
                 <Link
                   to={item.to}
@@ -230,15 +236,18 @@ function AppContent() {
                 location.pathname === '/settings' ? 'Configurações' :
                   location.pathname === '/history' ? 'Histórico de Entregas' :
                     location.pathname === '/stock' ? 'Controle de Estoque' :
-                      location.pathname === '/routes' ? 'Logística de Rotas' :
-                        location.pathname === '/equipment' ? 'Equipamentos' :
+              location.pathname === '/maintenance' ? 'Manutenção Preventiva' :
+              location.pathname === '/equipment' ? 'Equipamentos' :
                           location.pathname === '/equipment/bi' ? 'BI Dashboard' :
                           location.pathname === '/admin' ? 'Administração' :
                             location.pathname.includes('/protocol/') ? 'Editar Pedido' : 'Supply 2026'}
           </h2>
           
           <div className="flex items-center gap-6">
-            <ContractSwitcher />
+            <div className="flex items-center gap-4">
+              <NotificationBell />
+              <ContractSwitcher />
+            </div>
 
             <button
               onClick={() => setIsProfileOpen(true)}
@@ -263,19 +272,20 @@ function AppContent() {
           <div className="max-w-[1600px] mx-auto h-full overflow-auto custom-scrollbar">
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/wizard" element={<ProtocolWizard />} />
-              <Route path="/wizard/:id" element={<ProtocolWizard />} />
+              <Route path="/wizard" element={(user.role === 'insumos' || isAdmin) ? <ProtocolWizard /> : <Navigate to="/" />} />
+              <Route path="/wizard/:id" element={(user.role === 'insumos' || isAdmin) ? <ProtocolWizard /> : <Navigate to="/" />} />
               <Route path="/setup-contract/:contractId" element={<ContractSetupWizard />} />
               <Route path="/new-protocol" element={<Navigate to="/wizard" replace />} />
               <Route path="/protocol/:id" element={<ProtocolEditor />} />
               <Route path="/protocol/:id/deliver" element={<DeliveryPage />} />
               <Route path="/settings" element={<DataManagement />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/stock" element={<StockDashboard />} />
-              <Route path="/routes" element={<RouteDashboard />} />
-              <Route path="/solicitantes" element={<SolicitantesDashboard />} />
-              <Route path="/equipment" element={<EquipmentDashboard />} />
-              <Route path="/equipment/bi" element={<BIDashboard />} />
+              <Route path="/history" element={(user.role === 'insumos' || isAdmin) ? <History /> : <Navigate to="/" />} />
+              <Route path="/stock" element={(user.role === 'insumos' || isAdmin) ? <StockDashboard /> : <Navigate to="/" />} />
+              <Route path="/routes" element={(user.role === 'insumos' || isAdmin) ? <RouteDashboard /> : <Navigate to="/" />} />
+              <Route path="/maintenance" element={(user.role === 'manutencao' || isAdmin) ? <MaintenanceDashboard /> : <Navigate to="/" />} />
+              <Route path="/solicitantes" element={(user.role === 'manutencao' || isAdmin) ? <SolicitantesDashboard /> : <Navigate to="/" />} />
+              <Route path="/equipment" element={(user.role === 'manutencao' || user.role === 'insumos' || isAdmin) ? <EquipmentDashboard /> : <Navigate to="/" />} />
+              <Route path="/equipment/bi" element={(user.role === 'manutencao' || user.role === 'insumos' || isAdmin) ? <BIDashboard /> : <Navigate to="/" />} />
               <Route path="/admin" element={(user.role === 'admin' || user.role === 'superadmin') ? <AdminPanel /> : <Navigate to="/" />} />
               <Route path="/contracts/new" element={(user.role === 'admin' || user.role === 'superadmin') ? <FullPageWizard /> : <Navigate to="/" />} />
               <Route path="*" element={<Navigate to="/" replace />} />

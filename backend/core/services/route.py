@@ -485,7 +485,11 @@ class RouteService:
                 "Fila": safe_str(row.get('Fila', '')),
                 "Local": f"{safe_str(row.get('LocalInstalacao', ''))} - {safe_str(row.get('RuaRef', ''))}",
                 "LocalInstalacao": safe_str(row.get('LocalInstalacao', '')),
+                "Endereco": safe_str(row.get('Endereco', '')),  # endereço externo separado
+                "Area": safe_str(row.get('Area', '') or row.get('Setor', '')),
+                "PlantaInstalada": safe_str(row.get('PlantaInstalada', '')),
                 "Rua": safe_str(row.get('RuaRef', '')),
+                "RuaRef": safe_str(row.get('RuaRef', '')),
                 "Ramal": safe_str(row.get('Ramal', '')),
                 "Contato": safe_str(row.get('ContatoSetor', '') or row.get('Contato', '')),
                 "Contador_Atual": safe_num(current_counter),

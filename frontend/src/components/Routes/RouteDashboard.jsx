@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthProvider';
 import api from "../../lib/api";
@@ -72,19 +72,28 @@ export default function RouteDashboard() {
     useEffect(() => {
         const loadMappings = async () => {
             try {
-                const res = await api.get('/data/mappings');
+                const res = await api.get('data/mappings');
                 const mapaExtras = res.data.MAPA?.EXTRAS || [];
                 setExtrasMeta(mapaExtras);
-            } catch (err) {
-
+            } catch (_err) {
+                // Silent
             }
         };
         loadMappings();
     }, [contractId]);
 
+    const fetchRoutes = useCallback(async () => {
+        try {
+            const res = await api.get('routes/', { params: { contract_id: contractId } });
+            setRoutes(Array.isArray(res.data) ? res.data : []);
+        } catch (_error) {
+            setRoutes([]);
+        }
+    }, [contractId]);
+
     useEffect(() => {
         fetchRoutes();
-    }, [contractId]);
+    }, [fetchRoutes]);
 
     // Auto-select route from URL
     useEffect(() => {
@@ -95,19 +104,9 @@ export default function RouteDashboard() {
                 handleAnalyze(found);
             }
         }
-    }, [routes, searchParams]);
+    }, [routes, searchParams, selectedRoute, handleAnalyze]);
 
-    const fetchRoutes = async () => {
-        try {
-            const res = await api.get('routes/', { params: { contract_id: contractId } });
-            setRoutes(Array.isArray(res.data) ? res.data : []);
-        } catch (error) {
-
-            setRoutes([]);
-        }
-    };
-
-    const handleAnalyze = async (route) => {
+    const handleAnalyze = useCallback(async (route) => {
         setLoading(true);
         setSelectedRoute(route);
         setAnalysis([]);
@@ -119,20 +118,19 @@ export default function RouteDashboard() {
             if (data.length === 0) {
                 addToast("Nenhum equipamento correspondente encontrado para esta rota.", "warning");
             }
-        } catch (error) {
-
+        } catch (_error) {
             setAnalysis([]);
             addToast("Falha ao analisar rota.", "error");
         } finally {
             setLoading(false);
         }
-    };
+    }, [contractId, addToast]);
 
     // Filter Logic
     const { columns, setColumns, visibleColumns } = useColumns(`supply_route_cols_${user?.username}_${contractId}`, ROUTE_COLUMNS);
     const { widths, setColumnWidth } = useColumnWidths(`supply_route_cols_${user?.username}_${contractId}`);
 
-    const filteredAnalysis = React.useMemo(() => {
+    const filteredAnalysis = useMemo(() => {
         return analysis
             .filter(item => !excludedSeries.includes(item.Serie))
             .filter(item => {
@@ -184,7 +182,7 @@ export default function RouteDashboard() {
             setExcludedSeries([]);
             setAnalysis([]); 
             setSelectedRoute(null);
-        } catch (error) {
+        } catch (_error) {
 
         }
     };
@@ -200,7 +198,7 @@ export default function RouteDashboard() {
                     const res = await api.post('routes/preview', { filters: newRouteFilters, excluded_series: excludedSeries }, { params: { contract_id: contractId } });
                     setAnalysis(Array.isArray(res.data) ? res.data : []);
                     setSelectedRoute({ name: "Nova Rota (Preview)", series: [] });
-                } catch (err) {
+                } catch (_err) {
 
                 } finally {
                     setLoading(false);
@@ -247,7 +245,7 @@ export default function RouteDashboard() {
                         setSelectedRoute(null);
                         setAnalysis([]);
                     }
-                } catch (error) {
+                } catch (_error) {
 
                     addToast("Erro ao excluir rota.", "error");
                 }
@@ -295,31 +293,81 @@ export default function RouteDashboard() {
         setExcludedSeries(prev => prev.filter(s => s !== serie));
     };
 
+    // Core generate logic — reusable by both handleGenerate and handlePrintWithProtocols
+    const doGenerate = async () => {
+        const selection = filteredAnalysis.map(item => ({
+            Serie: item.Serie,
+            A4: (item.Sugestao_A4 && item.Sugestao_A4 > 0) ? item.Sugestao_A4 : 1,
+            TonerBk: item.Toner_Alerts.includes('BK') ? 1 : 0,
+            TonerCy: item.Toner_Alerts.includes('CY') ? 1 : 0,
+            TonerMg: item.Toner_Alerts.includes('MG') ? 1 : 0,
+            TonerYw: item.Toner_Alerts.includes('YW') ? 1 : 0
+        }));
+        const res = await api.post('routes/generate', { selection }, { params: { contract_id: contractId } });
+        const createdIds = res.data.created_ids || [];
+        // Map protocol IDs back to analysis items by position (same order as selection)
+        setAnalysis(prev => prev.map(item => {
+            const idx = selection.findIndex(s => s.Serie === item.Serie);
+            if (idx !== -1 && createdIds[idx]) {
+                return { ...item, Protocolo: createdIds[idx] };
+            }
+            return item;
+        }));
+        return createdIds.length;
+    };
+
     const handleGenerate = async () => {
         if (!filteredAnalysis.length) return;
-        
+
         setDeleteModal({
             title: "Gerar Protocolos",
             message: `Deseja gerar protocolos proativos para ${filteredAnalysis.length} máquinas listadas${filterStatus !== 'all' ? ' (filtro ativo)' : ''} na rota "${selectedRoute?.name}"?`,
             targetId: selectedRoute?.name || "CONFIRMAR",
             requireTyping: false,
+            confirmLabel: "Gerar Protocolos",
+            variant: "info",
             onConfirm: async () => {
                 setDeleteModal(null);
-                const selection = filteredAnalysis.map(item => ({
-                    Serie: item.Serie,
-                    A4: (item.Sugestao_A4 && item.Sugestao_A4 > 0) ? item.Sugestao_A4 : 1, 
-                    TonerBk: item.Toner_Alerts.includes('BK') ? 1 : 0,
-                    TonerCy: item.Toner_Alerts.includes('CY') ? 1 : 0,
-                    TonerMg: item.Toner_Alerts.includes('MG') ? 1 : 0,
-                    TonerYw: item.Toner_Alerts.includes('YW') ? 1 : 0
-                }));
-
                 try {
-                    const res = await api.post('routes/generate', { selection }, { params: { contract_id: contractId } });
-                    addToast(`Protocolos gerados: ${res.data.created_ids.length}`, "info");
-                } catch (error) {
+                    const count = await doGenerate();
+                    addToast(`Protocolos gerados: ${count}`, "info");
+                } catch (_error) {
                     addToast("Erro ao gerar protocolos", "error");
                 }
+            }
+        });
+    };
+
+    const handlePrintRoute = () => {
+        if (!filteredAnalysis.length) return;
+
+        // Check if protocols were already generated (any item has Protocolo set)
+        const alreadyGenerated = filteredAnalysis.some(item => item.Protocolo);
+        if (alreadyGenerated) {
+            setIsPrinting(true);
+            return;
+        }
+
+        setDeleteModal({
+            title: "Imprimir Rota",
+            message: `Para imprimir os números dos protocolos nos cards é necessário gerar os pedidos primeiro. Deseja gerar os ${filteredAnalysis.length} pedidos agora?`,
+            targetId: "CONFIRMAR",
+            requireTyping: false,
+            confirmLabel: "Gerar e Imprimir",
+            cancelLabel: "Imprimir sem números",
+            onConfirm: async () => {
+                setDeleteModal(null);
+                try {
+                    const count = await doGenerate();
+                    addToast(`${count} protocolo(s) gerado(s). Abrindo impressão...`, "success");
+                } catch (_error) {
+                    addToast("Erro ao gerar protocolos. Abrindo impressão sem números.", "warning");
+                }
+                setIsPrinting(true);
+            },
+            onCancel: () => {
+                setDeleteModal(null);
+                setIsPrinting(true);
             }
         });
     };
@@ -498,7 +546,7 @@ export default function RouteDashboard() {
                                             <Edit size={14} /> Configurar
                                         </button>
                                         <button
-                                            onClick={() => setIsPrinting(true)}
+                                            onClick={handlePrintRoute}
                                             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 text-[11px] font-bold uppercase transition-all shadow-sm"
                                         >
                                             <Printer size={14} /> Imprimir Rota
@@ -766,7 +814,13 @@ export default function RouteDashboard() {
                     title={deleteModal.title}
                     message={deleteModal.message}
                     targetId={deleteModal.targetId}
+                    requireTyping={deleteModal.requireTyping ?? false}
+                    variant={deleteModal.variant || "danger"}
+                    icon={deleteModal.icon}
+                    confirmLabel={deleteModal.confirmLabel}
+                    cancelLabel={deleteModal.cancelLabel}
                     onClose={() => setDeleteModal(null)}
+                    onCancel={deleteModal.onCancel}
                     onConfirm={deleteModal.onConfirm}
                 />
             )}

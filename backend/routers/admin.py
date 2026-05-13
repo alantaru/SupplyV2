@@ -27,31 +27,40 @@ class UpdateUserRequest(BaseModel):
 class CreateContractRequest(BaseModel):
     contract_id: str
 
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _get_admin_ids(contract: dict) -> List[str]:
+    """Normalize legacy admin_id (str) → admin_ids (list)."""
+    if "admin_ids" in contract:
+        v = contract["admin_ids"]
+        return v if isinstance(v, list) else [v]
+    legacy = contract.get("admin_id", "")
+    return [legacy] if legacy else []
+
+def _admin_owns_contract(admin_username: str, contract: dict) -> bool:
+    return admin_username in _get_admin_ids(contract)
+
+def _get_user_admin_ids(user_data: dict) -> List[str]:
+    """Normalize legacy created_by (str) → admin_ids (list) for users."""
+    if "admin_ids" in user_data:
+        v = user_data["admin_ids"]
+        return v if isinstance(v, list) else [v]
+    legacy = user_data.get("created_by", "")
+    return [legacy] if legacy else []
+
+def _admin_manages_user(admin_username: str, user_data: dict) -> bool:
+    return admin_username in _get_user_admin_ids(user_data)
+
 @router.get("/users")
-async def list_users(admin: Dict = Depends(auth.get_current_admin)):
-    all_users = users.load_users()
-    # Return safe list (no passwords)
-    safe_list = []
+async def list_users(admin_data: dict = Depends(auth.get_current_admin)):
+    try:
+        from ..core.services.admin import AdminService
+    except (ImportError, ValueError):
+        from core.services.admin import AdminService
     
-    requesting_role = admin.get("role", "admin") # admin or superadmin
-    requesting_username = admin.get("username")
-    
-    for u, data in all_users.items():
-        # [SECURITY] Admins cannot see Superadmins and can only see users they created (or themselves)
-        if requesting_role != "superadmin":
-            if data.get("role") == "superadmin":
-                continue
-            if u != requesting_username and data.get("created_by") != requesting_username:
-                continue
-                
-        user_info = data.copy()
-        user_info["username"] = u
-        if "password" in user_info:
-            del user_info["password"]
-        if "recovery_key_hash" in user_info:
-            del user_info["recovery_key_hash"]
-        safe_list.append(user_info)
-    return safe_list
+    svc = AdminService(admin_data.get("username"), admin_data.get("role"))
+    return svc.list_users()
 
 @router.post("/users")
 async def create_new_user(req: CreateUserRequest, admin: Dict = Depends(auth.get_current_admin)):
@@ -80,7 +89,8 @@ async def create_new_user(req: CreateUserRequest, admin: Dict = Depends(auth.get
         contracts=req.contracts,
         recovery_key_hash=recovery_hash,
         initial_route=req.initial_route,
-        created_by=admin.get("username")
+        created_by=admin.get("username"),
+        admin_ids=[admin.get("username")]  # new multi-admin field
     )
     
     return {
@@ -107,8 +117,8 @@ async def delete_user(username: str, admin: Dict = Depends(auth.get_current_admi
     if requesting_role != "superadmin":
         if username in PROTECTED_USERS or target_role == "superadmin":
             raise HTTPException(status_code=403, detail="Permission Denied: Cannot delete protected users or Superadmins.")
-        if target_user.get("created_by") != admin.get("username"):
-            raise HTTPException(status_code=403, detail="Permission Denied: You can only delete users you created.")
+        if not _admin_manages_user(admin.get("username"), target_user):
+            raise HTTPException(status_code=403, detail="Permission Denied: You can only delete users you manage.")
 
     users.delete_user(username)
     return {"status": "success"}
@@ -124,9 +134,25 @@ async def update_user(username: str, req: UpdateUserRequest, admin: Dict = Depen
     target_user = users.get_user(username)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    if admin.get("role") != "superadmin" and target_user.get("created_by") != admin.get("username") and username != admin.get("username"):
-        raise HTTPException(status_code=403, detail="Permission Denied: You can only edit users you created.")
+
+    requesting_role = admin.get("role", "admin")
+    requesting_username = admin.get("username")
+
+    if requesting_role != "superadmin":
+        target_role = target_user.get("role", "user")
+        # Admins cannot edit other admins/superadmins unless they manage them
+        if target_role in ("admin", "superadmin") and not _admin_manages_user(requesting_username, target_user) and username != requesting_username:
+            raise HTTPException(status_code=403, detail="Permission Denied: You can only edit users you manage.")
+        # For regular users: allow if admin manages them OR if all assigned contracts belong to admin
+        if target_role == "user" and not _admin_manages_user(requesting_username, target_user) and username != requesting_username:
+            try:
+                from ..core.contracts import ContractsManager
+            except (ImportError, ValueError):
+                from core.contracts import ContractsManager
+            mgr = ContractsManager()
+            admin_contracts = {c.get("id") for c in mgr.list_contracts() if _admin_owns_contract(requesting_username, c)}
+            if not set(req.contracts).issubset(admin_contracts):
+                raise HTTPException(status_code=403, detail="Permission Denied: You can only assign contracts you own.")
 
     users.update_user(username, {
         "contracts": req.contracts,
@@ -151,13 +177,13 @@ async def create_contract(
     
     try:
         mgr.create_contract(cid, req.get("name", cid), req.get("description", ""), admin_id=admin.username)
-        
+
         # Auto-associate the creator with the new contract
         user_contracts = admin.contracts
         if cid not in user_contracts:
             user_contracts.append(cid)
             users.update_user(admin.username, {"contracts": user_contracts})
-            
+
         return {"status": "success", "contract_id": cid}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -205,7 +231,7 @@ async def update_contract(
         with fsspec.open(storage.get_uri(key), "w", encoding="utf-8") as f:
             json.dump(current_contract, f, indent=4)
         
-    if admin.get("role") != "superadmin" and current_contract.get("admin_id") != admin.get("username"):
+    if admin.get("role") != "superadmin" and not _admin_owns_contract(admin.get("username"), current_contract):
         raise HTTPException(status_code=403, detail="Permission Denied: You do not own this contract.")
     
     try:
@@ -256,9 +282,9 @@ async def delete_contract(
             "admin_id": admin.get("username")
         }
         
-    if admin.get("role") != "superadmin" and current_contract.get("admin_id") != admin.get("username"):
+    if admin.get("role") != "superadmin" and not _admin_owns_contract(admin.get("username"), current_contract):
         raise HTTPException(status_code=403, detail="Permission Denied: You do not own this contract.")
-        
+
     if current_contract.get("status") != "inactive":
         raise HTTPException(status_code=400, detail="Only inactive contracts can be deleted.")
     
@@ -278,9 +304,91 @@ async def list_contracts(admin: Dict = Depends(auth.get_current_admin)):
         from core.contracts import ContractsManager
     mgr = ContractsManager()
     all_contracts = mgr.list_contracts()
+
+    # Build superadmin set for filtering
+    all_users_data = users.load_users()
+    superadmin_usernames = {u for u, d in all_users_data.items() if d.get("role") == "superadmin"}
+
     if admin.get("role") != "superadmin":
-        return [c for c in all_contracts if c.get("admin_id") == admin.get("username")]
+        owned = [c for c in all_contracts if _admin_owns_contract(admin.get("username"), c)]
+        # Strip superadmin names from admin_ids before returning to admin
+        for c in owned:
+            raw = _get_admin_ids(c)
+            c["admin_ids"] = [a for a in raw if a not in superadmin_usernames]
+        return owned
+
+    # Superadmin: return everything with full admin_ids
+    for c in all_contracts:
+        c["admin_ids"] = _get_admin_ids(c)
     return all_contracts
+
+@router.put("/contracts/{cid_path}/assign-admins")
+async def assign_contract_admins(
+    cid_path: str,
+    req: dict = Body(...),  # {"admin_ids": ["user1", "user2"]}
+    admin: Dict = Depends(auth.get_current_admin)
+):
+    """Superadmin-only: set the list of admins that own a contract."""
+    if admin.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Permission Denied: Only Superadmins can manage contract ownership.")
+
+    try:
+        from ..core.contracts import ContractsManager
+    except (ImportError, ValueError):
+        from core.contracts import ContractsManager
+
+    new_admin_ids = req.get("admin_ids", [])
+    if not isinstance(new_admin_ids, list):
+        raise HTTPException(status_code=400, detail="admin_ids must be a list")
+
+    # Validate all target users exist and are admin/superadmin
+    for aid in new_admin_ids:
+        target = users.get_user(aid)
+        if not target:
+            raise HTTPException(status_code=404, detail=f"User '{aid}' not found")
+        if target.get("role") not in ("admin", "superadmin"):
+            raise HTTPException(status_code=400, detail=f"User '{aid}' is not an admin or superadmin")
+
+    mgr = ContractsManager()
+    current = mgr.get_contract(cid_path)
+    if not current:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    updated = mgr.update_contract(cid_path, {"admin_ids": new_admin_ids, "admin_id": new_admin_ids[0] if new_admin_ids else ""})
+    updated["admin_ids"] = new_admin_ids
+    return {"status": "success", "contract": updated}
+
+
+@router.put("/users/{username}/assign-admins")
+async def assign_user_admins(
+    username: str,
+    req: dict = Body(...),  # {"admin_ids": ["admin1", "admin2"]}
+    admin: Dict = Depends(auth.get_current_admin)
+):
+    """Superadmin-only: set the list of admins that manage a user."""
+    if admin.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Permission Denied: Only Superadmins can manage user admin assignments.")
+
+    target_user = users.get_user(username)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_admin_ids = req.get("admin_ids", [])
+    if not isinstance(new_admin_ids, list):
+        raise HTTPException(status_code=400, detail="admin_ids must be a list")
+
+    for aid in new_admin_ids:
+        u = users.get_user(aid)
+        if not u:
+            raise HTTPException(status_code=404, detail=f"User '{aid}' not found")
+        if u.get("role") not in ("admin", "superadmin"):
+            raise HTTPException(status_code=400, detail=f"User '{aid}' is not an admin or superadmin")
+
+    users.update_user(username, {
+        "admin_ids": new_admin_ids,
+        "created_by": new_admin_ids[0] if new_admin_ids else target_user.get("created_by", "")
+    })
+    return {"status": "success", "username": username, "admin_ids": new_admin_ids}
 
 @router.get("/contracts/{contract_id}/status")
 async def get_contract_status(contract_id: str, admin: Dict = Depends(auth.get_current_admin)):

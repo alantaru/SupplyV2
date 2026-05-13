@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthProvider';
 import api from '../../lib/api';
@@ -23,10 +23,7 @@ const TABS = [
 export default function BIDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const activeContract = user?.activeContract;
-  const contractId = typeof activeContract === 'string'
-    ? activeContract
-    : activeContract?.contract_id || activeContract?.id;
+  const contractId = user?.activeContract;
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,10 +39,10 @@ export default function BIDashboard() {
       const params = { contract_id: contractId };
       if (dateFilter.start) params.start_date = dateFilter.start;
       if (dateFilter.end) params.end_date = dateFilter.end;
-      const res = await api.get('/bi/dashboard', { params });
+      const res = await api.get('bi/dashboard', { params });
       setData(res.data);
-    } catch (err) {
-      setError(err?.response?.data?.detail || 'Erro ao carregar dashboard');
+    } catch (_err) {
+      setError(_err?.response?.data?.detail || 'Erro ao carregar dashboard');
     } finally {
       setLoading(false);
     }

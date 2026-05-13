@@ -11,63 +11,44 @@ class EquipmentService:
 
     def search(self, term: str) -> List[Dict[str, Any]]:
         """
-        Search for equipment in Mapa by Fila or Serie.
+        Search for equipment in Mapa by Fila or Serie (Optimized with Caching).
         """
-        df_mapa = database.load_mapa(self.contract_id)
-        if df_mapa.empty:
-            return []
-            
         term = str(term).strip().lower()
         if len(term) < 1:
             return []
 
-        # Use Adapter for normalization EARLY
-        try:
-            from .. import adapters
-        except (ImportError, ValueError):
-            from core import adapters
-            
-        # Normalize the whole DF to get canonical keys (Fila, Serie, etc.)
-        normalized_all = adapters.normalize_dataframe(df_mapa)
-        df_norm = pd.DataFrame(normalized_all)
+        # Use load_normalized which is now cached
+        df_norm = database.load_normalized("MAPA", self.contract_id)
         
         if df_norm.empty:
             return []
             
-        # Ensure we have Fila and Serie keys
-        if 'Fila' not in df_norm.columns or 'Serie' not in df_norm.columns:
-            return []
-
-        def safe_str(val):
-            return str(val).strip().lower() if pd.notna(val) else ""
-
-        # Search on Canonical Keys + some fallback fields that might be in the normalized dicts
-        mask = (
-            df_norm['Fila'].apply(safe_str).str.contains(term) | 
-            df_norm['Serie'].apply(safe_str).str.contains(term)
-        )
+        # Search on Canonical Keys (Vectorized for speed)
+        # We search across Fila, Serie, IP, and Modelo/ModeloSimpress
+        search_cols = ['Fila', 'Serie', 'IP', 'ModeloSimpress', 'Modelo', 'LocalInstalacao']
+        available_cols = [c for c in search_cols if c in df_norm.columns]
         
-        # Optional check for IP or other fields that might be present
-        for col in ['IP', 'ModeloSimpress', 'LocalInstalacao']:
-            if col in df_norm.columns:
-                mask = mask | df_norm[col].apply(safe_str).str.contains(term)
+        if not available_cols:
+            return []
+            
+        mask = pd.Series(False, index=df_norm.index)
+        for col in available_cols:
+            mask |= df_norm[col].astype(str).str.lower().str.contains(term, na=False)
                 
-        matches = df_norm[mask]
+        matches = df_norm[mask].head(50)
         
         if matches.empty:
             return []
             
-        # Limit to 50 results
-        matches = matches.head(50)
-        
         # Search returns a specific subset for the dropdown
         results = []
         for _, row in matches.iterrows():
+            # Standardize on 'Modelo' for the frontend wizard
             results.append({
                 "Serie": row.get('Serie', ''),
                 "Fila": row.get('Fila', ''),
-                "Modelo": row.get('ModeloSimpress', ''), 
-                "Status": row.get('Status', ''), # Mixed case is fine for frontend
+                "Modelo": row.get('ModeloSimpress', '') or row.get('Modelo', ''), 
+                "Status": row.get('Status', ''),
                 "Local": row.get('LocalInstalacao', '')
             })
             
@@ -83,12 +64,8 @@ class EquipmentService:
         
         df_mapa = df_mapa.fillna("")
         
-        # Use Adapter
-        try:
-            from .. import adapters
-        except (ImportError, ValueError):
-            from core import adapters
-        normalized_results = adapters.normalize_dataframe(df_mapa)
+        # Use load_normalized
+        normalized_results = database.load_normalized("MAPA", self.contract_id).to_dict(orient='records')
         
         results = []
         for row in normalized_results:
@@ -96,32 +73,66 @@ class EquipmentService:
                 "Serie": row.get('Serie', ''),
                 "Fila": row.get('Fila', ''),
                 "Modelo": row.get('ModeloSimpress', ''), 
-                "Status": row.get('STATUS', ''),
+                "Status": row.get('Status', ''),
                 "Empresa": row.get('Empresa', ''),
                 "Cidade": row.get('Cidade', ''),
                 "Local": row.get('LocalInstalacao', ''),
-                "Contato": row.get('Contato', ''),
+                "Contato": row.get('ContatoSetor', ''),
                 "Ramal": row.get('Ramal', '')
             })
             
         return results
 
+    def get_inventory_enriched(self) -> List[Dict[str, Any]]:
+        """
+        Returns MAPA rows enriched with toner data from Contadores.
+        Uses unified normalization for both.
+        """
+        df_mapa = database.load_normalized("MAPA", self.contract_id)
+        df_cnt = database.load_normalized("CONTADORES", self.contract_id)
+
+        if df_mapa.empty:
+            return []
+
+        # Build toner lookup from normalized Contadores
+        toner_lookup = {}
+        if not df_cnt.empty:
+            for _, row in df_cnt.iterrows():
+                serie = row.get('Serie', '')
+                if not serie:
+                    continue
+                toner_lookup[serie] = {
+                    'toner_bk': row.get('toner_bk_pct', ''),
+                    'toner_cy': row.get('toner_cy_pct', ''),
+                    'toner_mg': row.get('toner_mg_pct', ''),
+                    'toner_yw': row.get('toner_yw_pct', ''),
+                }
+
+        # Enrich MAPA rows
+        records = df_mapa.to_dict(orient='records')
+        for row in records:
+            serie = row.get('Serie', '')
+            toner = toner_lookup.get(serie, {})
+            row.update({
+                'toner_bk': toner.get('toner_bk', ''),
+                'toner_cy': toner.get('toner_cy', ''),
+                'toner_mg': toner.get('toner_mg', ''),
+                'toner_yw': toner.get('toner_yw', ''),
+            })
+            # Fallback for localization
+            if not str(row.get('LocalInstalacao', '')).strip():
+                row['LocalInstalacao'] = row.get('RuaRef', '')
+
+        return records
+
     def get_details(self, serie: str) -> Optional[Dict[str, Any]]:
         """
         Get full equipment details including counters and suggestions.
         """
-        df_mapa = database.load_mapa(self.contract_id)
-        if 'SERIE' not in df_mapa.columns and 'Serie' in df_mapa.columns:
-            df_mapa.rename(columns={'Serie': 'SERIE'}, inplace=True)
+        df_mapa = database.load_normalized("MAPA", self.contract_id)
 
-        if df_mapa.empty or 'SERIE' not in df_mapa.columns:
+        if df_mapa.empty or 'Serie' not in df_mapa.columns:
             return None
-        
-        try:
-            from .. import adapters
-        except (ImportError, ValueError):
-            from core import adapters
-        df_mapa = pd.DataFrame(adapters.normalize_dataframe(df_mapa))
         
         # After normalization, 'SERIE' becomes 'Serie' (Canonical)
         mask = df_mapa['Serie'].astype(str).str.contains(serie, case=False, na=False)
@@ -220,25 +231,12 @@ class EquipmentService:
     # --- Private Helpers ---
 
     def _get_contadores_data(self, serie: str) -> Dict[str, Any]:
-        try:
-            df = database.load_contadores(self.contract_id)
-        except Exception:
-            return {}
+        df = database.load_normalized("CONTADORES", self.contract_id)
             
-        if df.empty:
+        if df.empty or 'Serie' not in df.columns:
             return {}
         
-        # Determine Serie Col
-        col_serie = 'SERIE' if 'SERIE' in df.columns else 'Serie'
-        if col_serie not in df.columns:
-            return {}
-            
-        # Use Adapter for consistent normalization
-        from .. import adapters
-        serie_norm = adapters.normalize_serie(serie)
-        df['Serie_Norm'] = df[col_serie].apply(adapters.normalize_serie)
-        
-        match = df[df['Serie_Norm'] == serie_norm]
+        match = df[df['Serie'] == serie]
         if match.empty:
             return {}
             
@@ -247,48 +245,35 @@ class EquipmentService:
         
         counter = 0
         try:
-            # Try canonical TOTAL first, then legacy variants (case-insensitive)
-            col_map_upper = {c.upper(): c for c in row.index}
-            for candidate in ['TOTAL', 'E&C COUNTER TOTAL', 'EQA4 COUNTER TOTAL']:
-                actual = col_map_upper.get(candidate.upper())
-                if actual and pd.notna(row.get(actual)):
-                    counter = int(float(str(row[actual]).replace(',', '.')))
-                    break
+            # Post-normalization column names are TitleCase but Contadores special fields are toner_...
+            # The total counter should be mapped to 'ContadorTotal' if we added it, but let's check.
+            # Currently adapters.py doesn't map 'TOTAL' to 'ContadorTotal'. I should add it.
+            counter = int(float(str(row.get('ContadorTotal', 0)).replace(',', '.')))
         except Exception:
             pass
 
         return {
             "counter_total": counter,
-            "toner_bk_pct": safe_val(row.get('%BK')),
-            "toner_cy_pct": safe_val(row.get('%CY')),
-            "toner_mg_pct": safe_val(row.get('%Mg') or row.get('%MG')), # Case variance
-            "toner_yw_pct": safe_val(row.get('%Yw') or row.get('%YW'))
+            "toner_bk_pct": safe_val(row.get('toner_bk_pct')),
+            "toner_cy_pct": safe_val(row.get('toner_cy_pct')),
+            "toner_mg_pct": safe_val(row.get('toner_mg_pct')),
+            "toner_yw_pct": safe_val(row.get('toner_yw_pct'))
         }
 
     def _get_paper_data(self, serie: str) -> Dict[str, Any]:
-        try:
-            df = database.load_papel(self.contract_id)
-        except Exception:
+        df = database.load_normalized("PAPEL", self.contract_id)
+            
+        if df.empty or 'Serie' not in df.columns:
             return {}
             
-        col_serie = 'SERIE' if 'SERIE' in df.columns else 'Serie'
-        if df.empty or col_serie not in df.columns:
-            return {}
-            
-        # Use col_serie found earlier
-        # Use Adapter for consistent normalization
-        from .. import adapters
-        serie_norm = adapters.normalize_serie(serie)
-        df['Serie_Norm'] = df[col_serie].apply(adapters.normalize_serie)
-        
-        match = df[df['Serie_Norm'] == serie_norm]
+        match = df[df['Serie'] == serie]
         if match.empty:
             return {}
             
         row = match.iloc[0]
         return {
-            "media_sheets": self._parse_br_float(row.get('MEDIA', 0)),
-            "a4_resma": self._parse_br_float(row.get('A4RESMA', 0))
+            "media_sheets": self._parse_br_float(row.get('MediaSheets', 0)),
+            "a4_resma": self._parse_br_float(row.get('A4Resma', 0))
         }
 
     def _parse_br_float(self, val):
@@ -448,87 +433,93 @@ class EquipmentService:
 
     def get_unique_values(self, field: str, current_filters: List[Dict[str, Any]] = None) -> List[str]:
         """
-        Get unique sorted values for a specific field in MAPA, 
+        Get unique sorted values for a specific field in MAPA,
         filtered by current_filters (Context-Aware / Cascading).
         Logic: OR within same field, AND between different fields.
+
+        Operates on the NORMALIZED dataframe so column names and values
+        are consistent with what the frontend displays.
         """
-        df = database.load_mapa(self.contract_id)
-        if df.empty:
+        df_raw = database.load_mapa(self.contract_id)
+        if df_raw.empty:
             return []
 
-        # Mapping common UI names to internal CSV columns
-        # Mapping common UI names to internal CSV columns (Use Canonical UPPER)
-        mapping = {
-            'Cidade': 'CIDADE',
-            'Status': 'STATUS', 
-            'Modelo': 'MODELOSIMPRESS',
-            'ModeloSimpress': 'MODELOSIMPRESS',
-            'Fila': 'FILA',
-            'Empresa': 'EMPRESA',
-            'Rua': 'RUAREF',
-            'RuaRef': 'RUAREF',
-            'Planta': 'PLANTAINSTALADA',
-            'PlantaInstalada': 'PLANTAINSTALADA',
-            'Setor': 'AREA',
-            'Area': 'AREA',
-            'Contrato': 'CONTRATO'
+        # Normalize through the adapter pipeline — same as every other view
+        try:
+            from .. import adapters
+        except (ImportError, ValueError):
+            from core import adapters
+
+        normalized = adapters.normalize_dataframe(df_raw)
+        if not normalized:
+            return []
+        df = pd.DataFrame(normalized)
+
+        # Canonical field names after normalization (adapter output keys)
+        # Maps UI field name → normalized DataFrame column name
+        FIELD_MAP = {
+            'Cidade':          'Cidade',
+            'Status':          'Status',
+            'Modelo':          'ModeloSimpress',
+            'ModeloSimpress':  'ModeloSimpress',
+            'Fila':            'Fila',
+            'Empresa':         'Empresa',
+            'Rua':             'RuaRef',
+            'RuaRef':          'RuaRef',
+            'Planta':          'PlantaInstalada',
+            'PlantaInstalada': 'PlantaInstalada',
+            'Setor':           'Area',
+            'Area':            'Area',
+            'Contrato':        'Contrato',
         }
-        
-        # Helper to get internal col name
-        def get_col(f):
-            # First direct map
-            c = mapping.get(f, f)
-            if c in df.columns:
-                return c
-            
-            # Try upper (Canonical)
-            if c.upper() in df.columns:
-                return c.upper()
-            
-            # Try finding case-insensitive match
+
+        def resolve_col(f: str) -> Optional[str]:
+            """Find the actual column in df for a given UI field name."""
+            canonical = FIELD_MAP.get(f, f)
+            # Exact match
+            if canonical in df.columns:
+                return canonical
+            # Case-insensitive fallback
             for col in df.columns:
-                if col.upper() == c.upper():
+                if col.upper() == canonical.upper():
                     return col
             return None
 
-        # 1. Apply Filters
+        # 1. Apply cascade filters (AND between fields, OR within same field)
         if current_filters:
-            # Group by field
-            field_groups = {}
-            for f in current_filters:
-                k = f.get('field')
-                v = f.get('value')
-                if not k or not v:
-                    continue
-                if k not in field_groups:
-                    field_groups[k] = []
-                field_groups[k].append(v)
-            
-            # Apply groups (AND between groups)
+            field_groups: Dict[str, List[str]] = {}
+            for flt in current_filters:
+                k = flt.get('field', '').strip()
+                v = str(flt.get('value', '')).strip()
+                if k and v:
+                    field_groups.setdefault(k, []).append(v)
+
             for f_key, vals in field_groups.items():
-                col_name = get_col(f_key)
+                col_name = resolve_col(f_key)
                 if not col_name:
-                    continue
-                
-                # OR within group
-                # Filter df to rows where col_name is in vals
-                # Use str comparison for safety
-                mask = df[col_name].astype(str).isin([str(v) for v in vals])
+                    continue  # Unknown field — skip silently
+                # OR within group: keep rows where column value is in vals (case-insensitive)
+                vals_lower = {v.lower() for v in vals}
+                mask = df[col_name].astype(str).str.strip().str.lower().isin(vals_lower)
                 df = df[mask]
-                
-        if df.empty:
-            return []
-        
-        # 2. Get Targets
-        target_col = get_col(field)
-        
+                if df.empty:
+                    return []
+
+        # 2. Get unique values for the requested field
+        target_col = resolve_col(field)
         if not target_col:
             return []
-            
-        # Get unique, non-null values
-        values = df[target_col].dropna().astype(str).unique().tolist()
-        values = [v for v in values if v.strip()] # Remove empty strings
-        values.sort()
+
+        values = (
+            df[target_col]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .unique()
+            .tolist()
+        )
+        values = [v for v in values if v and v.lower() not in ('nan', 'none', '')]
+        values.sort(key=lambda x: x.lower())
         return values
         
     def _get_last_delivery_data_enhanced(self, serie: str) -> Dict[str, Any]:

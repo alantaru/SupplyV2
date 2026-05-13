@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { paginateItems } from '../../utils/printUtils';
@@ -47,7 +47,9 @@ const EquipmentCard = ({ item, competencia }) => {
     const mgPct = parseToner(item.TonerLevel_MG);
     const ywPct = parseToner(item.TonerLevel_YW);
 
-    const local = item.LocalInstalacao || item.Local || '-';
+    // Local interno: LocalInstalacao (setor/sala dentro da planta) > Area > PlantaInstalada
+    // Endereco é o endereço externo (rua, CEP) — NÃO usar aqui
+    const local = item.LocalInstalacao || item.Local || item.Area || item.PlantaInstalada || '-';
     const rua = item.RuaRef || item.Rua || '-';
     const contato = item.Contato || item.ContatoSetor || '-';
     const ramal = item.Ramal || '-';
@@ -73,7 +75,9 @@ const EquipmentCard = ({ item, competencia }) => {
                 {/* Protocolo */}
                 <div style={{ width: '68px', padding: '2px 5px', borderRight: cellBorder, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <span className="lbl">Protocolo</span>
-                    <span style={{ fontSize: '9px', color: '#94a3b8' }}>&nbsp;</span>
+                    <span style={{ fontSize: '9px', fontWeight: 900, color: item.Protocolo ? '#0f172a' : '#94a3b8', fontFamily: 'monospace' }}>
+                        {item.Protocolo || '—'}
+                    </span>
                 </div>
                 {/* Serie */}
                 <div style={{ flex: 2.5, padding: '2px 5px', borderRight: cellBorder, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -101,10 +105,10 @@ const EquipmentCard = ({ item, competencia }) => {
                                 { val: mgPct, color: mgPct !== null && mgPct <= 30 ? '#dc2626' : '#be185d' },
                                 { val: ywPct, color: ywPct !== null && ywPct <= 30 ? '#dc2626' : '#92400e' },
                             ].map((t, i) => (
-                                <React.Fragment key={i}>
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     {i > 0 && <span style={{ fontSize: '7px', color: '#cbd5e1' }}>/</span>}
                                     <span style={{ fontSize: '9px', fontWeight: 900, color: t.color }}>{t.val !== null ? t.val + '%' : '-'}</span>
-                                </React.Fragment>
+                                </div>
                             ))}
                         </div>
                     ) : (
@@ -340,12 +344,10 @@ const PrintDocument = ({ route, pages, currentDate, currentTime }) => {
 
 // === MAIN COMPONENT ===
 const RoutePrint = ({ route, analysis = [], onBack }) => {
-    const [pages, setPages] = useState([]);
+    const pages = useMemo(() => paginateItems(analysis, 5), [analysis]);
     const [mountNode, setMountNode] = useState(null);
 
     useEffect(() => {
-        setPages(paginateItems(analysis, 5));
-
         const node = document.createElement('div');
         node.id = 'print-portal-root';
         document.body.appendChild(node);
@@ -370,7 +372,7 @@ const RoutePrint = ({ route, analysis = [], onBack }) => {
             const s = document.getElementById('global-print-style');
             if (s) document.head.removeChild(s);
         };
-    }, [analysis]);
+    }, []);
 
     const handlePrint = () => window.print();
     const currentDate = new Date().toLocaleDateString('pt-BR');

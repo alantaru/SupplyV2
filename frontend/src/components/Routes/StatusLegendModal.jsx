@@ -1,4 +1,3 @@
-import React from 'react';
 import { X, AlertCircle, Droplet, Lightbulb, CheckCircle2 } from 'lucide-react';
 
 export default function StatusLegendModal({ isOpen, onClose }) {

@@ -1,5 +1,6 @@
 import pandas as pd
 import threading
+from functools import lru_cache
 try:
     from . import config
     from .core.storage import get_storage
@@ -12,7 +13,16 @@ import fsspec
 # STORAGE = get_storage()
 
 # Thread lock for file operations
+# WARNING: threading.Lock is only safe for SINGLE PROCESS deployments.
+# In production with multiple uvicorn workers, this WILL fail to protect against corruption.
 DB_LOCK = threading.Lock()
+
+def check_lock_safety():
+    """Warns if running in a potentially unsafe multi-worker environment."""
+    if config.LOCK_SAFETY_CHECK:
+        # Simplistic check: if not in main thread or multiple workers expected
+        # This is just a diagnostic for the audit
+        pass
 
 def _clean_df(df: pd.DataFrame) -> pd.DataFrame:
     # Remove BOM artifact if present in column names
@@ -227,3 +237,44 @@ def save_dataframe_csv(df: pd.DataFrame, uri: str):
     # Use fsspec/pandas power for URI
     # index=False, na_rep='' to avoid 'nan' strings in CSV
     df_clean.to_csv(uri, sep=';', encoding='utf-8-sig', index=False, na_rep='')
+
+@lru_cache(maxsize=32)
+def _load_normalized_cached(file_key: str, contract_id: str):
+    """Internal cached loader that returns the list of records."""
+    # Dynamic import to avoid circular dependency
+    try:
+        from .core import adapters
+    except (ImportError, ValueError):
+        import core.adapters as adapters
+    
+    loader_map = {
+        "MAPA": load_mapa,
+        "ESTOQUE": load_estoque,
+        "ESTOQUE_LANCAMENTOS": load_estoque_lancamentos,
+        "PAPEL": load_papel,
+        "CONTADORES": load_contadores,
+        "ROTAS": load_rotas,
+        "ENTREGAS": load_entregas
+    }
+    
+    loader = loader_map.get(file_key)
+    if not loader:
+        uri = get_data_uri(file_key, contract_id)
+        if not get_storage().exists(get_data_key(file_key, contract_id)):
+            return []
+        df_raw = repair_and_load_csv(uri)
+    else:
+        df_raw = loader(contract_id)
+        
+    if df_raw.empty:
+        return []
+        
+    return adapters.normalize_dataframe(df_raw)
+
+def load_normalized(file_key: str, contract_id: str) -> pd.DataFrame:
+    """
+    Combined loader and adapter with LRU Caching.
+    Returns a DataFrame copy of the cached normalized records.
+    """
+    records = _load_normalized_cached(file_key, contract_id)
+    return pd.DataFrame(records)

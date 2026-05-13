@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthProvider';
 import { Save, AlertCircle, RefreshCw, LayoutTemplate } from 'lucide-react';
@@ -11,8 +11,6 @@ const MAPPING_FILES = [
 
 export default function ColumnMappingSettings({ embeddedFileKey = null, activeContractId = null }) {
     const { user } = useAuth();
-    // FIX: activeContract is on user object, not directly from useAuth()
-    const activeContract = activeContractId || user?.activeContract;
     const [activeFile, setActiveFile] = useState(embeddedFileKey || 'MAPA');
 
     // Data State
@@ -35,9 +33,9 @@ export default function ColumnMappingSettings({ embeddedFileKey = null, activeCo
         // Since we use session-based auth now (/data endpoints), we don't strictly need activeContract
         // But we want to reload if the user switches files
         loadData();
-    }, [activeFile]);
+    }, [activeFile, loadData]);
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             setLoading(true);
             setStatus(null);
@@ -73,16 +71,16 @@ export default function ColumnMappingSettings({ embeddedFileKey = null, activeCo
             try {
                 const headRes = await api.get(`/data/files/${activeFile}/headers`);
                 setDetectedHeaders(headRes.data.headers || []);
-            } catch (err) {
+            } catch (_err) {
                 setDetectedHeaders([]);
             }
 
-        } catch (error) {
+        } catch (_error) {
             setStatus({ type: 'error', msg: "Erro ao carregar dados. Verifique permissões." });
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeFile]);
 
     const handleSave = async () => {
         try {
@@ -104,7 +102,7 @@ export default function ColumnMappingSettings({ embeddedFileKey = null, activeCo
 
             setSavedMapping(cleanMapping);
             setStatus({ type: 'success', msg: "Mapeamento salvo com sucesso!" });
-        } catch (error) {
+        } catch (_error) {
 
             setStatus({ type: 'error', msg: "Erro ao salvar mapeamento." });
         } finally {
@@ -313,7 +311,7 @@ export default function ColumnMappingSettings({ embeddedFileKey = null, activeCo
                                                 Nenhum campo customizado definido.
                                             </div>
                                         )}
-                                        {extras.map((ex, idx) => (
+                                        {extras.map((ex) => (
                                             <div key={ex.key} className="grid grid-cols-12 gap-3 p-3 items-center bg-slate-50/30 dark:bg-slate-800/30">
                                                 <div className="col-span-3">
                                                     <input

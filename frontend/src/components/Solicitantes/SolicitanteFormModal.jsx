@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, User, Save, Loader2, Plus, Trash2, Search, Link } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import api from '../../lib/api';
@@ -48,7 +48,7 @@ export default function SolicitanteFormModal({ mode = "create", initial = {}, on
         const t = setTimeout(async () => {
             setEquipLoading(true);
             try {
-                const res = await api.get('/data/assist/inventory', { params: { contract_id: contractId } });
+                const res = await api.get('data/assist/inventory', { params: { contract_id: contractId } });
                 const all = Array.isArray(res.data) ? res.data : [];
                 const q = equipSearch.toLowerCase();
                 setEquipResults(all.filter(item =>
@@ -90,7 +90,7 @@ export default function SolicitanteFormModal({ mode = "create", initial = {}, on
                 equipamentos,
             });
             onClose();
-        } catch (err) {
+        } catch (_err) {
             setError(err.response?.data?.detail || err.message || 'Erro ao salvar.');
         } finally {
             setSaving(false);

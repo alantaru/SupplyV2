@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, Folder, Download, Laptop, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { downloadFileFromAPI } from '../../lib/utils';
@@ -27,7 +27,7 @@ export default function DownloadSettings() {
             window.INTERNAL_DOWNLOAD_AUDIT = customDestEnabled;
             
             addToast("Configurações de download atualizadas.", "success");
-        } catch (err) {
+        } catch (_err) {
             addToast("Erro ao salvar configurações.", "error");
         } finally {
             setTimeout(() => setIsSaving(false), 500);

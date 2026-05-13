@@ -1,0 +1,23 @@
+{
+  "state_persistence": {
+    "mechanism": "LocalStorage (Fragile)",
+    "stored_keys": ["token", "active_contract", "site_logo_url", "site_title", "site_logo_mode", "user_avatar_{username}"],
+    "risk": "Loss of UI customization on cache clear; 5MB LocalStorage limit risk with Base64 images"
+  },
+  "api_communication": {
+    "library": "Axios",
+    "interceptors": {
+      "request": "Injects Bearer Token + active_contract ID automatically (except for /admin routes)",
+      "response": "Auto-redirects to /login on 401 Unauthorized"
+    }
+  },
+  "routing_logic": {
+    "engine": "react-router-dom v6",
+    "guards": ["AuthGuard (checks user object)", "ContractGuard (forces selection/creation if missing)"],
+    "critical_paths": {
+      "/": "Dashboard (Pedidos Pendentes)",
+      "/solicitantes": "SolicitantesDashboard (Current focus)",
+      "/admin": "AdminPanel (Roles: admin, superadmin)"
+    }
+  }
+}

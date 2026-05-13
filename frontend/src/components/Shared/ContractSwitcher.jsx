@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthProvider';
 import { ChevronDown, Check, Building2, Loader2 } from 'lucide-react';
 import api from '../../lib/api';
@@ -7,32 +7,33 @@ import { cn } from '../../lib/utils';
 export default function ContractSwitcher() {
     const { user, updateActiveContract } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
-    const [availableContracts, setAvailableContracts] = useState([]);
+    const [fetchedContracts, setFetchedContracts] = useState([]);
     const [loadingContracts, setLoadingContracts] = useState(false);
 
     const isPrivileged = user?.role === 'superadmin' || user?.role === 'admin';
 
     useEffect(() => {
-        if (!user) return;
+        if (!user || !isPrivileged) return;
 
-        if (isPrivileged) {
-            // Superadmin/admin: fetch ALL contracts from the server
-            setLoadingContracts(true);
-            api.get('admin/contracts')
-                .then(res => {
-                    const list = Array.isArray(res.data) ? res.data : [];
-                    setAvailableContracts(list.map(c => ({ id: c.id, name: c.name || c.id })));
-                })
-                .catch(() => {
-                    // Fallback to JWT contracts
-                    setAvailableContracts((user.contracts || []).map(id => ({ id, name: id })));
-                })
-                .finally(() => setLoadingContracts(false));
-        } else {
-            // Regular user: use their assigned contracts
-            setAvailableContracts((user.contracts || []).map(id => ({ id, name: id })));
-        }
-    }, [user?.username, user?.role]);
+        // Superadmin/admin: fetch ALL contracts from the server
+        setLoadingContracts(true);
+        api.get('admin/contracts')
+            .then(res => {
+                const list = Array.isArray(res.data) ? res.data : [];
+                setFetchedContracts(list.map(c => ({ id: c.id, name: c.name || c.id })));
+            })
+            .catch(() => {
+                // Fallback will be handled by the derivation logic
+            })
+            .finally(() => setLoadingContracts(false));
+    }, [user?.username, user?.role, isPrivileged]);
+
+    const availableContracts = useMemo(() => {
+        if (!user) return [];
+        if (isPrivileged && fetchedContracts.length > 0) return fetchedContracts;
+        // Fallback for admin or default for regular user
+        return (user.contracts || []).map(id => ({ id, name: id }));
+    }, [user, isPrivileged, fetchedContracts]);
 
     const handleSelect = (contractId) => {
         if (contractId === user?.activeContract) {

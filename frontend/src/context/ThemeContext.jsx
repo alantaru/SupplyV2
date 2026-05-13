@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthProvider';
 import api from '../lib/api';
 
@@ -29,7 +29,7 @@ export function ThemeProvider({ children }) {
         if (user.accent && user.accent !== accent) {
             setAccent(user.accent);
         }
-    }, [user?.username]); // Only when user identity changes
+    }, [user, theme, accent]); // Sync when user, theme or accent changes
 
     // Apply theme to DOM
     useEffect(() => {
